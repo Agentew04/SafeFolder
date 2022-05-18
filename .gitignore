@@ -419,3 +419,4 @@ FodyWeavers.xsd
 # Ignore code-workspaces
 
 # End of https://www.toptal.com/developers/gitignore/api/csharp,visualstudiocode
+/.idea/.idea.SafeFolder/.idea/vcs.xml
