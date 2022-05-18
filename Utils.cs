@@ -140,6 +140,20 @@ namespace SafeFolder
             var files = binaryReader.ReadStrings();
             return files;
         }
+
+        public static void SetFilesToSafeFile()
+        {
+            var hash = GetHashFromSafeFile();
+            var iv = Utils.GenerateIV();
+
+            using var binaryWriter = new BinaryWriter(File.OpenWrite(_safeFilePath));
+            binaryWriter.Write(false);
+            binaryWriter.Write(hash);
+            binaryWriter.Write(Installer.GetFiles());
+            binaryWriter.Write(Installer.GetFolders());
+            binaryWriter.Write(iv.Length);
+            binaryWriter.Write(iv);
+        }
         
         public static IEnumerable<string> GetFoldersFromSafeFile()
         {

