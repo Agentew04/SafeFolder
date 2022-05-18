@@ -2,14 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Diagnostics;
 
 namespace SafeFolder
 {
     public static class Installer{
         
         private static readonly string _currentPath = Environment.CurrentDirectory;
+        private static readonly string _safeFolderName = Process.GetCurrentProcess().ProcessName;
         private static readonly string _safeFilePath = $"{_currentPath}\\.safe";
-        private static readonly string _safeFolderName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
         public static bool IsInstalled() => File.Exists(_safeFilePath);
 
         public static void Install()
@@ -51,7 +52,8 @@ namespace SafeFolder
             Console.WriteLine("Safe Folder Installed!");
         }
 
-        public static IEnumerable<string> GetFiles() => Directory.GetFiles(_currentPath).Where(f => !f.EndsWith(".safe") && !f.EndsWith($"{_safeFolderName}.exe"));
+        public static IEnumerable<string> GetFiles() => Directory.GetFiles(_currentPath)
+            .Where(f => !f.EndsWith(".safe") && !f.EndsWith($"{_safeFolderName}.exe"));
 
         public static IEnumerable<string> GetFolders() => Directory.GetDirectories(_currentPath);
     }
