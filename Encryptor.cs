@@ -1,26 +1,23 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
-using System.Text;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace SafeFolder{
     public static class Encryptor{
-        internal static void AESFileEncrypt(string inputFile, string outputFile, byte[] key,byte[] iv){
+        internal static void AesFileEncrypt(string inputFile, string outputFile, byte[] key,byte[] iv){
             var cryptFile = outputFile ?? throw new ArgumentNullException(nameof(outputFile));
             using var fsCrypt = new FileStream(cryptFile, FileMode.Create);
 
-            using var AES = Aes.Create();
-            AES.KeySize = 256;
-            AES.BlockSize = 128;
-            AES.Key = key;
-            AES.IV = iv;
-            AES.Padding = PaddingMode.PKCS7;
-            AES.Mode = CipherMode.CBC;
+            using var aes = Aes.Create();
+            aes.KeySize = 256;
+            aes.BlockSize = 128;
+            aes.Key = key;
+            aes.IV = iv;
+            aes.Padding = PaddingMode.PKCS7;
+            aes.Mode = CipherMode.CBC;
 
             using var cs = new CryptoStream(fsCrypt,
-                AES.CreateEncryptor(),
+                aes.CreateEncryptor(),
                 CryptoStreamMode.Write);
 
             using var fsIn = new FileStream(inputFile, FileMode.Open);
@@ -30,19 +27,19 @@ namespace SafeFolder{
                 cs.WriteByte((byte)data);
         }
 
-        internal static void AESFileDecrypt(string inputFile, string outputFile, byte[] key,byte[] iv){
+        internal static void AesFileDecrypt(string inputFile, string outputFile, byte[] key,byte[] iv){
             using var fsCrypt = new FileStream(inputFile, FileMode.Open);
 
-            using var AES = Aes.Create();
-            AES.KeySize = 256;
-            AES.BlockSize = 128;
-            AES.Key = key;
-            AES.IV = iv;
-            AES.Padding = PaddingMode.PKCS7;
-            AES.Mode = CipherMode.CBC;
+            using var aes = Aes.Create();
+            aes.KeySize = 256;
+            aes.BlockSize = 128;
+            aes.Key = key;
+            aes.IV = iv;
+            aes.Padding = PaddingMode.PKCS7;
+            aes.Mode = CipherMode.CBC;
 
             using var cs = new CryptoStream(fsCrypt,
-                AES.CreateDecryptor(),
+                aes.CreateDecryptor(),
                 CryptoStreamMode.Read);
 
             using var fsOut = new FileStream(outputFile, FileMode.Create);
@@ -52,21 +49,21 @@ namespace SafeFolder{
                 fsOut.WriteByte((byte)data);
         }
         
-        public static string AESEncryptString(string plainText, byte[] Key, byte[] IV)
+        public static string AesEncryptString(string plainText, byte[] key, byte[] iv)
         {
             // Check arguments.
             if (plainText is not { Length: > 0 })
                 throw new ArgumentNullException(nameof(plainText));
-            if (Key is not { Length: > 0 })
-                throw new ArgumentNullException(nameof(Key));
-            if (IV is not { Length: > 0 })
-                throw new ArgumentNullException(nameof(IV));
+            if (key is not { Length: > 0 })
+                throw new ArgumentNullException(nameof(key));
+            if (iv is not { Length: > 0 })
+                throw new ArgumentNullException(nameof(iv));
 
             // Create an AesManaged object
             // with the specified key and IV.
             using var aesAlg = Aes.Create();
-            aesAlg.Key = Key;
-            aesAlg.IV = IV;
+            aesAlg.Key = key;
+            aesAlg.IV = iv;
 
             // Create an encryptor to perform the stream transform.
             var encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
@@ -83,26 +80,25 @@ namespace SafeFolder{
             return Convert.ToBase64String(encrypted);
         }
 
-        public static string AESDecryptString(string cipherText, byte[] Key, byte[] IV)
+        public static string AesDecryptString(string cipherText, byte[] key, byte[] iv)
         {
             // Check arguments.
             if (cipherText is not { Length: > 0 })
                 throw new ArgumentNullException(nameof(cipherText));
-            if (Key is not { Length: > 0 })
-                throw new ArgumentNullException(nameof(Key));
-            if (IV is not { Length: > 0 }) //black magic
-                throw new ArgumentNullException(nameof(IV));
+            if (key is not { Length: > 0 })
+                throw new ArgumentNullException(nameof(key));
+            if (iv is not { Length: > 0 }) //black magic
+                throw new ArgumentNullException(nameof(iv));
 
             // Declare the string used to hold
             // the decrypted text.
-            string plaintext = null;
 
             // Create an AesManaged object
             // with the specified key and IV.
             // was using AesManaged aesAlg = new AesManaged();
             using var aesAlg = Aes.Create();
-            aesAlg.Key = Key;
-            aesAlg.IV = IV;
+            aesAlg.Key = key;
+            aesAlg.IV = iv;
 
             // Create a decryptor to perform the stream transform.
             var decryptor = aesAlg.CreateDecryptor(aesAlg.Key, aesAlg.IV);
@@ -115,7 +111,7 @@ namespace SafeFolder{
             using var srDecrypt = new StreamReader(csDecrypt);
             // Read the decrypted bytes from the decrypting stream
             // and place them in a string.
-            plaintext = srDecrypt.ReadToEnd();
+            var plaintext = srDecrypt.ReadToEnd();
 
             return plaintext;
         }

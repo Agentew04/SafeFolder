@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using System.Threading;
 
 namespace SafeFolder
@@ -81,16 +79,17 @@ namespace SafeFolder
         public static void Write(this BinaryWriter stream, IEnumerable<string> strings)
         {
             // Write the number of strings
-            stream.Write(strings.Count());
+            var stringsList = strings.ToList();
+            stream.Write(stringsList.Count);
             
             // Write each string
-            foreach (var str in strings)
+            foreach (var str in stringsList)
             {
                 stream.Write(str);
             }
         }
 
-        public static IEnumerable<string> ReadStrings(this BinaryReader stream)
+        private static IEnumerable<string> ReadStrings(this BinaryReader stream)
         {
             var strings = new List<string>();
             // Read the number of strings
@@ -144,7 +143,7 @@ namespace SafeFolder
         public static void SetFilesToSafeFile()
         {
             var hash = GetHashFromSafeFile();
-            var iv = Utils.GenerateIV();
+            var iv = Utils.GenerateIv();
 
             using var binaryWriter = new BinaryWriter(File.OpenWrite(_safeFilePath));
             binaryWriter.Write(false);
@@ -165,7 +164,7 @@ namespace SafeFolder
             return folders;
         }
         
-        public static byte[] GetIVFromSafeFile()
+        public static byte[] GetIvFromSafeFile()
         {
             using var binaryReader = new BinaryReader(File.OpenRead(_safeFilePath));
             _ = binaryReader.ReadBoolean();
@@ -184,19 +183,17 @@ namespace SafeFolder
 
         public static string HashFile(string path){
             //hash file
-            string hash = "";
-            using(FileStream fs = File.OpenRead(path)){
-                using(SHA256 sha = SHA256.Create()){
-                    byte[] hashbytes = sha.ComputeHash(fs);
-                    hash = Convert.ToBase64String(hashbytes);
-                }
-            }
+            using var fs = File.OpenRead(path);
+            using var sha = SHA256.Create();
+            var hashBytes = sha.ComputeHash(fs);
+            var hash = Convert.ToBase64String(hashBytes);
+
             return hash;
         }
         
         public static byte[] CreateKey(string hash, string password) => Convert.FromHexString(RawHash(hash + password));
 
-        public static byte[] GenerateIV()
+        public static byte[] GenerateIv()
         {
             //generate random IV
             using var aes = Aes.Create();

@@ -1,15 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Security.Cryptography;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 
 namespace SafeFolder;
 
-public class Program
+public static class Program
 {
-    private static void Main(string[] args)
+    private static async Task Main()
     {   
         // get if .safe file is installed
         if (!Installer.IsInstalled())
@@ -31,7 +27,7 @@ public class Program
         var isValid = BCrypt.Net.BCrypt.Verify(pwd, hashFile);
         if(!isValid){
             Console.WriteLine("Wrong password.");
-            var maxTry = 2; // 3 but user already used once
+            const int maxTry = 2; // 3 but user already used once
             var tryCount = 0;
             while (tryCount < maxTry)
             {
@@ -60,16 +56,16 @@ public class Program
             // have to encrypt
             Console.WriteLine("Encrypting files...");
             Utils.SetFilesToSafeFile();
-            Engine.PackFiles(key);
-            Engine.PackFolders(key);
+            await Engine.PackFiles(key);
+            await Engine.PackFolders(key);
             Utils.SetStateToSafeFile(true); 
         }
         else
         {
             // have to decrypt
             Console.WriteLine("Decrypting files...");
-            Engine.UnpackFiles(key);
-            Engine.UnpackFolders(key);
+            await Engine.UnpackFiles(key);
+            await Engine.UnpackFolders(key);
             Utils.SetStateToSafeFile(false);
         }
         Console.WriteLine("Done!");

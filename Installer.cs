@@ -43,7 +43,7 @@ namespace SafeFolder
             binaryWriter.Write(files);
             binaryWriter.Write(folders);
 
-            var iv = Utils.GenerateIV();
+            var iv = Utils.GenerateIv();
             binaryWriter.Write(iv.Length);
             binaryWriter.Write(iv);
 
