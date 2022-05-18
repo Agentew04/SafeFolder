@@ -29,13 +29,13 @@ namespace SafeFolder
             }
 
             var pwdHash = Utils.GetHash(pwd);
-            var finalHash = Utils.GetHash(pwdHash + pwd);
+            // var finalHash = Utils.GetHash(pwdHash + pwd);
             
             // write current state
             binaryWriter.Write(false);
             
             // write finalHash to safeFile
-            binaryWriter.Write(finalHash);
+            binaryWriter.Write(pwdHash);
 
             var files = GetFiles();
             var folders = GetFolders();

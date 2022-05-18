@@ -194,7 +194,7 @@ namespace SafeFolder
             return hash;
         }
         
-        public static byte[] CreateKey(string hash, string password) => Convert.FromHexString(GetHash(hash + password));
+        public static byte[] CreateKey(string hash, string password) => Convert.FromHexString(RawHash(hash + password));
 
         public static byte[] GenerateIV()
         {
@@ -204,11 +204,7 @@ namespace SafeFolder
         }
 
         public static string GetHash(string str){
-            const int hashNum = 500_000;
-            for(var i=0;i<hashNum;i++){
-                str = RawHash(str);
-            }
-            return str;
+            return BCrypt.Net.BCrypt.HashPassword(str);
         }        
         private static string RawHash(string s){
             //sha256

@@ -28,10 +28,7 @@ public class Program
             return;
         }
             
-        var pwdHash = Utils.GetHash(pwd);
-        var finalHash = Utils.GetHash(pwdHash + pwd);
-            
-        var isValid = finalHash == hashFile;
+        var isValid = BCrypt.Net.BCrypt.Verify(pwd, hashFile);
         if(!isValid){
             Console.WriteLine("Wrong password.");
             var maxTry = 2; // 3 but user already used once
@@ -39,9 +36,9 @@ public class Program
             while (tryCount < maxTry)
             {
                 pwd = Utils.GetPasswordInput("Enter password: ");
-                pwdHash = Utils.GetHash(pwd);
-                finalHash = Utils.GetHash(pwdHash + pwd);
-                isValid = finalHash == hashFile;
+                // pwdHash = Utils.GetHash(pwd);
+                // finalHash = Utils.GetHash(pwdHash + pwd);
+                isValid = BCrypt.Net.BCrypt.Verify(pwd, hashFile);
                 if (isValid) break;
                 tryCount++;
             }
