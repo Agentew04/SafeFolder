@@ -24,8 +24,13 @@ jobs:
       run: dotnet publish -p:PublishSingleFile=true -r win-x64 -c Release --self-contained true -p:PublishTrimmed=true -p:EnableCompressionInSingleFile=true
     - name: Test
       run: dotnet test --no-build --verbosity normal
-    - name: Upload build artifacts
+    - name: Upload Source artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: Build
+        name: Source
         path: ${{ github.workspace }}
+    - name: Upload Bin artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: Bin
+        path: bin/Release/net6.0/win-x64/publish/
