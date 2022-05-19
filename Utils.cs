@@ -109,7 +109,7 @@ namespace SafeFolder
         #region  safeFile
         
         private static readonly string _currentPath = Environment.CurrentDirectory;
-        private static readonly string _safeFilePath = $"{_currentPath}\\.safe";
+        private static readonly string _safeFilePath = $"{_currentPath}/.safe";
         
         public static bool GetStateFromSafeFile()
         {

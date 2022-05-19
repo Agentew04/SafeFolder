@@ -10,7 +10,7 @@ namespace SafeFolder
         
         private static readonly string _currentPath = Environment.CurrentDirectory;
         private static readonly string _safeFolderName = Process.GetCurrentProcess().ProcessName;
-        private static readonly string _safeFilePath = $"{_currentPath}\\.safe";
+        private static readonly string _safeFilePath = $"{_currentPath}/.safe";
         public static bool IsInstalled() => File.Exists(_safeFilePath);
 
         public static void Install()
@@ -53,7 +53,7 @@ namespace SafeFolder
         }
 
         public static IEnumerable<string> GetFiles() => Directory.GetFiles(_currentPath)
-            .Where(f => !f.EndsWith(".safe") && !f.EndsWith($"{_safeFolderName}.exe"));
+            .Where(f => !f.EndsWith(".safe") && !f.EndsWith(_safeFolderName) && !f.EndsWith($"{_safeFolderName}.exe"));
 
         public static IEnumerable<string> GetFolders() => Directory.GetDirectories(_currentPath);
     }
