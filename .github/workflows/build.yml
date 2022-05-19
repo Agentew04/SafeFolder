@@ -34,3 +34,12 @@ jobs:
       with:
         name: Bin
         path: bin/Release/net6.0/win-x64/publish/
+    - name: Release Development Build
+      id: automatic_releases
+      uses: marvinpinto/action-automatic-releases@v1.2.1
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        automatic_release_tag: "latest"
+        title: "Development Build"
+        files: |
+            bin/Release/net6.0/win-x64/publish/SafeFolder.exe
