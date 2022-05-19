@@ -72,6 +72,15 @@ namespace SafeFolder
             Thread.Sleep(5000);
         }
         
+        public static void WriteLine(string message, ConsoleColor color = ConsoleColor.White)
+        {
+            Console.ForegroundColor = color;
+            if(!message.EndsWith("\n"))
+                message+= "\n";
+            Console.Write(message);
+            Console.ResetColor();
+        }
+        
         #endregion
 
         #region Binary

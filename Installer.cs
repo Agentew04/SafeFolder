@@ -13,7 +13,7 @@ namespace SafeFolder
         private static readonly string _safeFilePath = $"{_currentPath}/.safe";
         public static bool IsInstalled() => File.Exists(_safeFilePath);
 
-        public static void Install()
+        public static bool Install()
         {
             // file will be binary
             using var binaryWriter = new BinaryWriter(File.Open(_safeFilePath, FileMode.Create));
@@ -24,8 +24,8 @@ namespace SafeFolder
             
             if (pwd != rePwd)
             {
-                Console.WriteLine("Passwords do not match, exiting");
-                return;
+                Utils.WriteLine("Passwords do not match, exiting", ConsoleColor.Red);
+                return false;
             }
 
             var pwdHash = Utils.GetHash(pwd);
@@ -50,6 +50,7 @@ namespace SafeFolder
             File.SetAttributes(_safeFilePath, FileAttributes.Hidden);
 
             Console.WriteLine("Safe Folder Installed!");
+            return true;
         }
 
         public static IEnumerable<string> GetFiles() => Directory.GetFiles(_currentPath)

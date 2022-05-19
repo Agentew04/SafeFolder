@@ -10,8 +10,12 @@ public static class Program
         // get if .safe file is installed
         if (!Installer.IsInstalled())
         {
-            Console.WriteLine("SafeFolder is not installed. Installing now.");
-            Installer.Install();
+            Utils.WriteLine("SafeFolder is not installed. Installing now.", ConsoleColor.Yellow);
+            var canProceed = Installer.Install();
+            if(!canProceed) {
+                Utils.WriteLine("SafeFolder installation failed. Exiting.", ConsoleColor.Red);
+                return;
+            }
         }
         Utils.ShowSplashScreen();
             
@@ -26,7 +30,8 @@ public static class Program
             
         var isValid = BCrypt.Net.BCrypt.Verify(pwd, hashFile);
         if(!isValid){
-            Console.WriteLine("Wrong password.");
+            Utils.WriteLine("Invalid password.", ConsoleColor.Red);
+
             const int maxTry = 2; // 3 but user already used once
             var tryCount = 0;
             while (tryCount < maxTry)
@@ -36,13 +41,15 @@ public static class Program
                 // finalHash = Utils.GetHash(pwdHash + pwd);
                 isValid = BCrypt.Net.BCrypt.Verify(pwd, hashFile);
                 if (isValid) break;
+                Utils.WriteLine("Invalid password.", ConsoleColor.Red);
                 tryCount++;
             }
         }
             
         if (!isValid)
         {
-            Utils.ShowCorrupt();
+            Utils.WriteLine("Too many invalid password attempts. Press any key to close.", ConsoleColor.Red);
+            Console.ReadKey(true);
             return;
         }
             
@@ -54,7 +61,7 @@ public static class Program
         if (!state)
         {
             // have to encrypt
-            Console.WriteLine("Encrypting files...");
+            Utils.WriteLine("Encrypting files...", ConsoleColor.Green);
             Utils.SetFilesToSafeFile();
             await Engine.PackFiles(key);
             await Engine.PackFolders(key);
@@ -63,12 +70,12 @@ public static class Program
         else
         {
             // have to decrypt
-            Console.WriteLine("Decrypting files...");
+            Utils.WriteLine("Decrypting files...", ConsoleColor.Green);
             await Engine.UnpackFiles(key);
             await Engine.UnpackFolders(key);
             Utils.SetStateToSafeFile(false);
         }
-        Console.WriteLine("Done!");
+        Utils.WriteLine("Done!", ConsoleColor.Green);
         Console.WriteLine("Press any key to close the program.");
         Console.ReadKey();
     }
