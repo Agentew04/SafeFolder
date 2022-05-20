@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace SafeFolder;
@@ -55,6 +56,9 @@ public static class Program
             
         // here we go
         //from here, the password is correct
+        
+        var stopWatch = new Stopwatch();
+        stopWatch.Start();
 
         var state = Utils.GetStateFromSafeFile();
         var key = Utils.CreateKey(hashFile, pwd);
@@ -75,7 +79,12 @@ public static class Program
             await Engine.UnpackFolders(key);
             Utils.SetStateToSafeFile(false);
         }
-        Utils.WriteLine("Done!", ConsoleColor.Green);
+        stopWatch.Stop();
+        var ms = stopWatch.Elapsed.Milliseconds;
+        var s = stopWatch.Elapsed.Seconds;
+        var m = stopWatch.Elapsed.Minutes;
+
+        Utils.WriteLine($"Done in {m}:{s}:{ms}!", ConsoleColor.Green);
         Console.WriteLine("Press any key to close the program.");
         Console.ReadKey();
     }
