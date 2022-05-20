@@ -15,6 +15,8 @@ namespace SafeFolder
 
         public static bool Install()
         {
+            // delete old safe
+            if (File.Exists(_safeFilePath)) File.Delete(_safeFilePath);
             // file will be binary
             using var binaryWriter = new BinaryWriter(File.Open(_safeFilePath, FileMode.Create));
 

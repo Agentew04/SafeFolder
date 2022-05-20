@@ -14,20 +14,22 @@ public static class Program
             Utils.WriteLine("SafeFolder is not installed. Installing now.", ConsoleColor.Yellow);
             var canProceed = Installer.Install();
             if(!canProceed) {
-                Utils.WriteLine("SafeFolder installation failed. Exiting.", ConsoleColor.Red);
+                Utils.WriteLine("SafeFolder installation failed.", ConsoleColor.Red);
+                Utils.WriteLine("Press any key to close...", ConsoleColor.Red);
                 return;
             }
         }
-        Utils.ShowSplashScreen();
-            
-        var pwd = Utils.GetPasswordInput("Enter password: ");
-
         var hashFile = Utils.GetHashFromSafeFile();
+
         if (string.IsNullOrWhiteSpace(hashFile))
         {
-            Utils.ShowCorrupt();
-            return;
+            if (!Utils.ShowCorrupt()) return;
+            hashFile = Utils.GetHashFromSafeFile();
         }
+
+        Utils.ShowSplashScreen();
+        
+        var pwd = Utils.GetPasswordInput("Enter password: ");
             
         var isValid = BCrypt.Net.BCrypt.Verify(pwd, hashFile);
         if(!isValid){

@@ -48,7 +48,7 @@ namespace SafeFolder
 ");
         }
         
-        public static void ShowCorrupt()
+        public static bool ShowCorrupt()
         {
             Console.WriteLine(@"
 =============================================
@@ -69,7 +69,15 @@ namespace SafeFolder
 
 =============================================
 ");
-            Thread.Sleep(5000);
+            WriteLine("Press any key to Reinstall...", ConsoleColor.Yellow);
+            Console.ReadKey(true);
+            var canProceed = Installer.Install();
+            if(!canProceed) {
+                Utils.WriteLine("SafeFolder installation failed.", ConsoleColor.Red);
+                Utils.WriteLine("Press any key to close...", ConsoleColor.Red);
+                return false;
+            }
+            return true;
         }
         
         public static void WriteLine(string message, ConsoleColor color = ConsoleColor.White)
@@ -134,10 +142,14 @@ namespace SafeFolder
         
         public static string GetHashFromSafeFile()
         {
-            using var binaryReader = new BinaryReader(File.OpenRead(_safeFilePath));
-            _ = binaryReader.ReadBoolean();
-            var hash = binaryReader.ReadString();
-            return hash;
+            try {
+                using var binaryReader = new BinaryReader(File.OpenRead(_safeFilePath));
+                _ = binaryReader.ReadBoolean();
+                var hash = binaryReader.ReadString();
+                return hash;
+            } catch (Exception) {
+                return "";
+            }
         }
 
         public static IEnumerable<string> GetFilesFromSafeFile()
