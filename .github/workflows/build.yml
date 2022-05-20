@@ -2,16 +2,25 @@ name: Build
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ dev ]
-  pull_request:
-    branches: [ dev ]
 
 jobs:
   build:
-
-    runs-on: windows-latest
-
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: win-x86
+          - os: windows-latest
+            target: win-arm
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: ubuntu-latest
+            target: linux-arm
+          - os: macos-latest
+            target: osx-x64
+          - os: macos-latest
+            target: osx-arm64
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET
@@ -21,25 +30,38 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: Build
-      run: dotnet publish -p:PublishSingleFile=true -r win-x64 -c Release --self-contained true -p:PublishTrimmed=true -p:EnableCompressionInSingleFile=true
+      run: dotnet publish -p:PublishSingleFile=true -r ${{ matrix.target }} -c Release --self-contained true -p:PublishTrimmed=true -p:EnableCompressionInSingleFile=true
     - name: Test
       run: dotnet test --no-build --verbosity normal
-    - name: Upload Source artifacts
-      uses: actions/upload-artifact@v3
+    - name: Zip
+      uses: TheDoctor0/zip-release@0.6.2
       with:
-        name: Source
-        path: ${{ github.workspace }}
+        filename: SafeFolder-${{ matrix.target }}.zip
+        directory: bin/Release/net6.0/${{ matrix.target }}/publish/
+        exclusions: '*.pdb'
     - name: Upload Bin artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: Bin
-        path: bin/Release/net6.0/win-x64/publish/
-    - name: Release Development Build
-      id: automatic_releases
-      uses: marvinpinto/action-automatic-releases@v1.2.1
-      with:
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        automatic_release_tag: "latest"
-        title: "Development Build"
-        files: |
-            bin/Release/net6.0/win-x64/publish/SafeFolder.exe
+        name: bin
+        path: bin/Release/net6.0/${{ matrix.target }}/publish/SafeFolder-${{ matrix.target }}.zip
+        
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/download-artifact@v2
+      - name: Upload Source artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: source
+          path: ${{ github.workspace }}
+      - name: Release Development Build
+        id: automatic_releases
+        uses: marvinpinto/action-automatic-releases@v1.2.1
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          automatic_release_tag: "latest"
+          title: "Development Build"
+          files: |
+              bin/*.zip
