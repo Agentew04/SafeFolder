@@ -62,21 +62,35 @@ public static class Program
 
         var state = Utils.GetStateFromSafeFile();
         var key = Utils.CreateKey(hashFile, pwd);
+        var isSuccess = true;
         if (!state)
         {
             // have to encrypt
             Utils.WriteLine("Encrypting files...", ConsoleColor.Green);
             Utils.SetFilesToSafeFile();
-            await Engine.PackFiles(key);
-            await Engine.PackFolders(key);
+            try{
+                await Engine.PackFiles(key);
+                await Engine.PackFolders(key);
+            }
+            catch (Exception){
+                Utils.WriteLine("Encryption failed. Press any key to close.", ConsoleColor.Red);
+                isSuccess = false;
+            }
+
             Utils.SetStateToSafeFile(true); 
         }
-        else
-        {
+        else{
             // have to decrypt
             Utils.WriteLine("Decrypting files...", ConsoleColor.Green);
-            await Engine.UnpackFiles(key);
-            await Engine.UnpackFolders(key);
+            try
+            {
+                await Engine.UnpackFiles(key);
+                await Engine.UnpackFolders(key);
+            }catch(Exception){
+                Utils.WriteLine("Decryption failed. Press any key to close.", ConsoleColor.Red);
+                isSuccess = false;
+            }
+
             Utils.SetStateToSafeFile(false);
         }
         stopWatch.Stop();
@@ -84,7 +98,7 @@ public static class Program
         var s = stopWatch.Elapsed.Seconds;
         var m = stopWatch.Elapsed.Minutes;
 
-        Utils.WriteLine($"Done in {m}:{s}:{ms}!", ConsoleColor.Green);
+        if(isSuccess) Utils.WriteLine($"Done in {m}:{s}:{ms}!", ConsoleColor.Green);
         Console.WriteLine("Press any key to close the program.");
         Console.ReadKey();
     }
