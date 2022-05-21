@@ -3,18 +3,24 @@ using System.IO;
 using System.Security.Cryptography;
 
 namespace SafeFolder{
-    public static class Encryptor{
+    public static class Encryptor
+    {
+        private static readonly int _keySize = 256;
+        private static readonly int _blockSize = 128;
+        private static readonly PaddingMode _paddingMode = PaddingMode.PKCS7;
+        private static readonly CipherMode _cipherMode = CipherMode.CBC;
+        
         internal static void AesFileEncrypt(string inputFile, string outputFile, byte[] key,byte[] iv){
             var cryptFile = outputFile ?? throw new ArgumentNullException(nameof(outputFile));
             using var fsCrypt = new FileStream(cryptFile, FileMode.Create);
 
             using var aes = Aes.Create();
-            aes.KeySize = 256;
-            aes.BlockSize = 128;
+            aes.KeySize = _keySize;
+            aes.BlockSize = _blockSize;
+            aes.Padding = _paddingMode;
+            aes.Mode = _cipherMode;
             aes.Key = key;
             aes.IV = iv;
-            aes.Padding = PaddingMode.PKCS7;
-            aes.Mode = CipherMode.CBC;
 
             using var cs = new CryptoStream(fsCrypt,
                 aes.CreateEncryptor(),
@@ -31,12 +37,12 @@ namespace SafeFolder{
             using var fsCrypt = new FileStream(inputFile, FileMode.Open);
 
             using var aes = Aes.Create();
-            aes.KeySize = 256;
-            aes.BlockSize = 128;
+            aes.KeySize = _keySize;
+            aes.BlockSize = _blockSize;
+            aes.Padding = _paddingMode;
+            aes.Mode = _cipherMode;
             aes.Key = key;
             aes.IV = iv;
-            aes.Padding = PaddingMode.PKCS7;
-            aes.Mode = CipherMode.CBC;
 
             using var cs = new CryptoStream(fsCrypt,
                 aes.CreateDecryptor(),

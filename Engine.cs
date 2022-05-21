@@ -21,7 +21,7 @@ public static class Engine
             {
                 var dirInfo = new DirectoryInfo(folder);
                 var zipName = $"./{dirInfo.Name}.zip";
-                ZipFile.CreateFromDirectory(dirInfo.FullName, zipName);
+                ZipFile.CreateFromDirectory(dirInfo.FullName, zipName, CompressionLevel.Fastest, false);
                 Encryptor.AesFileEncrypt(zipName, zipName + ".enc", key, Utils.GetIvFromSafeFile());
                 File.Delete(zipName);
                 Directory.Delete(folder, true);
