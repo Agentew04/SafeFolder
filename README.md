@@ -3,7 +3,7 @@
 
 ![license](https://img.shields.io/github/license/Agentew04/SafeFolder)
 ![downloads](https://img.shields.io/github/downloads/Agentew04/Safefolder/total)
-![linesofcode](https://img.shields.io/tokei/lines/github/Agentew04/SafeFolder?label=lines%20of%20code)
+![codesize](https://img.shields.io/github/languages/code-size/Agentew04/SafeFolder)
 ![issues](https://img.shields.io/github/issues/Agentew04/SafeFolder)
 ![pullrequests](https://img.shields.io/github/issues-pr/Agentew04/SafeFolder)
 ![platform](https://img.shields.io/badge/Platform-Win%20%7C%20Linux%20%7C%20OSX-blue)
