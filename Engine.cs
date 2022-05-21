@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace SafeFolder;
@@ -27,7 +29,14 @@ public static class Engine
                 Directory.Delete(folder, true);
             }));
         }
-        await Task.WhenAll(taskList);
+        var whenAllTask = Task.WhenAll(taskList);
+        try{
+            await whenAllTask;
+        }
+        catch{
+            whenAllTask.Exception.InnerExceptions.ToList()
+                .ForEach(e => Utils.WriteLine(e.Message, ConsoleColor.Red));
+        }
     }
     
     public static async Task UnpackFolders(byte[] key)
@@ -50,7 +59,14 @@ public static class Engine
             }));
         }
 
-        await Task.WhenAll(taskList);
+        var whenAllTask = Task.WhenAll(taskList);
+        try{
+            await whenAllTask;
+        }
+        catch{
+            whenAllTask.Exception.InnerExceptions.ToList()
+                .ForEach(e => Utils.WriteLine(e.Message, ConsoleColor.Red));
+        }
     }
 
     #endregion
@@ -72,7 +88,15 @@ public static class Engine
                     File.Delete(file);
                 }));
         }
-        await Task.WhenAll(taskList);
+
+        var whenAllTask = Task.WhenAll(taskList);
+        try{
+            await whenAllTask;
+        }
+        catch{
+            whenAllTask.Exception.InnerExceptions.ToList()
+                .ForEach(e => Utils.WriteLine(e.Message, ConsoleColor.Red));
+        }
     }
     
     public static async Task UnpackFiles(byte[] key)
@@ -90,7 +114,14 @@ public static class Engine
                     File.Delete(file + ".enc");
                 }));
         }
-        await Task.WhenAll(taskList);
+        var whenAllTask = Task.WhenAll(taskList);
+        try{
+            await whenAllTask;
+        }
+        catch{
+            whenAllTask.Exception.InnerExceptions.ToList()
+                .ForEach(e => Utils.WriteLine(e.Message, ConsoleColor.Red));
+        }
     }
 
     #endregion

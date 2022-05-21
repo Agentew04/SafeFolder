@@ -70,28 +70,16 @@ public static class Program
             // have to encrypt
             Utils.WriteLine("Encrypting files...", ConsoleColor.Green);
             Utils.SetFilesToSafeFile();
-            try{
-                await Engine.PackFiles(key);
-                await Engine.PackFolders(key);
-            }
-            catch (Exception){
-                Utils.WriteLine("Encryption failed. Press any key to close.", ConsoleColor.Red);
-                isSuccess = false;
-            }
+            await Engine.PackFiles(key);
+            await Engine.PackFolders(key);
 
             Utils.SetStateToSafeFile(true); 
         }
         else{
             // have to decrypt
             Utils.WriteLine("Decrypting files...", ConsoleColor.Green);
-            try
-            {
-                await Engine.UnpackFiles(key);
-                await Engine.UnpackFolders(key);
-            }catch(Exception){
-                Utils.WriteLine("Decryption failed. Press any key to close.", ConsoleColor.Red);
-                isSuccess = false;
-            }
+            await Engine.UnpackFiles(key);
+            await Engine.UnpackFolders(key);
 
             Utils.SetStateToSafeFile(false);
         }
@@ -100,7 +88,7 @@ public static class Program
         var s = stopWatch.Elapsed.Seconds;
         var m = stopWatch.Elapsed.Minutes;
 
-        if(isSuccess) Utils.WriteLine($"Done in {m}:{s}:{ms}!", ConsoleColor.Green);
+        Utils.WriteLine($"Done in {m}:{s}:{ms}!", ConsoleColor.Green);
         Console.WriteLine("Press any key to close the program.");
         Console.ReadKey();
     }
