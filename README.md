@@ -1,8 +1,8 @@
 # SafeFolder
 
-![build](https://img.shields.io/github/workflow/status/Agentew04/SafeFolder/Build/main)
-![downloads](https://img.shields.io/github/downloads/Agentew04/Safefolder/total)
 ![license](https://img.shields.io/github/license/Agentew04/SafeFolder)
+![downloads](https://img.shields.io/github/downloads/Agentew04/Safefolder/total)
+![linesofcode](https://img.shields.io/tokei/lines/github/Agentew04/SafeFolder?label=lines%20of%20code)
 ![issues](https://img.shields.io/github/issues/Agentew04/SafeFolder)
 ![pullrequests](https://img.shields.io/github/issues-pr/Agentew04/SafeFolder)
 ![platform](https://img.shields.io/badge/Platform-Win%20%7C%20Linux%20%7C%20OSX-blue)
@@ -22,8 +22,8 @@ we use a very secure method called _hashing_, that prevents attackers from rever
 
 1. First, download our app:
     1. To download **SafeFolder**, download from the latest version [here](https://github.com/Agentew04/SafeFolder/releases/latest)
-    2. Expand the _Assets_ tab down below and find a `SafeFolder.exe` file and click it.
-2. Drag and drop the `SafeFolder.exe` file in the folder that you want to protect
+    2. Expand the _**Assets**_ tab down below and find a `SafeFolder` file according to your operating system and click it.
+2. Drag and drop the `SafeFolder` file in the folder that you want to protect
 3. Execute and follow the instructions.
 4. Enjoy total privacy!
 
