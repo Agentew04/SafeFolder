@@ -1,4 +1,5 @@
-# SafeFolder
+# <div align="center">SafeFolder</div>
+<div align="center">
 
 ![license](https://img.shields.io/github/license/Agentew04/SafeFolder)
 ![downloads](https://img.shields.io/github/downloads/Agentew04/Safefolder/total)
@@ -7,6 +8,7 @@
 ![pullrequests](https://img.shields.io/github/issues-pr/Agentew04/SafeFolder)
 ![platform](https://img.shields.io/badge/Platform-Win%20%7C%20Linux%20%7C%20OSX-blue)
 ![architecture](https://img.shields.io/badge/Architecture-x64%20%7C%20x86%20%7C%20arm%20%7C%20arm64-orange)
+</div>
 
 SafeFolder is a lightweight, open source and cross-platform application that focuses in securing your device through advanced and cutting edge technology.
 
