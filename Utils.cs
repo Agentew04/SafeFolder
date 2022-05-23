@@ -11,6 +11,11 @@ namespace SafeFolder
 
         #region IO
 
+        /// <summary>
+        /// Shows a prompt and gets a string from the user(formatted with *).
+        /// </summary>
+        /// <param name="prompt">The text to be shown</param>
+        /// <returns>The input the user typed</returns>
         public static string GetPasswordInput(string prompt = "")
         {
             Console.Write(prompt);
@@ -36,6 +41,9 @@ namespace SafeFolder
             return password;
         }
 
+        /// <summary>
+        /// Shows the splash screen.
+        /// </summary>
         public static void ShowSplashScreen()
         {
             Console.WriteLine(@"
@@ -48,6 +56,10 @@ namespace SafeFolder
 ");
         }
         
+        /// <summary>
+        /// Shows the app corrupt message and reinstall the app.
+        /// </summary>
+        /// <returns></returns>
         public static bool ShowCorrupt()
         {
             Console.WriteLine(@"
@@ -80,6 +92,11 @@ namespace SafeFolder
             return true;
         }
         
+        /// <summary>
+        /// Writes a line to the console, with a color.
+        /// </summary>
+        /// <param name="message">The message, if not ends with \n, \n will be appended</param>
+        /// <param name="color">The color to write the message</param>
         public static void WriteLine(string message, ConsoleColor color = ConsoleColor.White)
         {
             Console.ForegroundColor = color;
@@ -93,6 +110,11 @@ namespace SafeFolder
 
         #region Binary
 
+        /// <summary>
+        /// Writes a list of strings to a binary stream(writable)
+        /// </summary>
+        /// <param name="stream">The binaryWriter object</param>
+        /// <param name="strings">The list containing the strings</param>
         public static void Write(this BinaryWriter stream, IEnumerable<string> strings)
         {
             // Write the number of strings
@@ -106,6 +128,11 @@ namespace SafeFolder
             }
         }
 
+        /// <summary>
+        /// Reads a list of strings written by <see cref="Write"/>
+        /// </summary>
+        /// <param name="stream">The stream containing the data</param>
+        /// <returns>An IEnumerable with the strings read</returns>
         private static IEnumerable<string> ReadStrings(this BinaryReader stream)
         {
             var strings = new List<string>();
@@ -121,6 +148,62 @@ namespace SafeFolder
             return strings;
         }
 
+        /// <summary>
+        /// Writes a GUID bytes to a binary stream
+        /// </summary>
+        /// <param name="stream">The binary stream</param>
+        /// <param name="guid">The <see cref="Guid"/> to be written</param>
+        private static void Write(this BinaryWriter stream, Guid guid)
+        {
+            var bytes = guid.ToByteArray();
+            stream.Write(bytes);
+        }
+
+        /// <summary>
+        /// Reads a guid from a binary stream
+        /// </summary>
+        /// <param name="stream">The binary stream</param>
+        /// <returns>The guid that has been read</returns>
+        private static Guid ReadGuid(this BinaryReader stream)
+        {
+            var bytes = stream.ReadBytes(16);
+            return new Guid(bytes);
+        }
+            
+        /// <summary>
+        /// Writes the file header to the stream
+        /// </summary>
+        /// <param name="writer">The binaryWrite object</param>
+        /// <param name="header">The header object</param>
+        public static void Write(this BinaryWriter writer, Header header)
+        {
+            writer.Write(header.size);
+            writer.Write(header.hash);
+            writer.Write(header.name);
+            writer.Write(header.guid);
+            writer.Write(header.ivLength);
+            writer.Write(header.iv);
+        }
+        
+        /// <summary>
+        /// Reads a header from a binary stream
+        /// </summary>
+        /// <param name="reader">the stream</param>
+        /// <returns>The header file that has been read</returns>
+        public static Header ReadHeader(this BinaryReader reader)
+        {
+            var header = new Header
+            {
+                size = reader.ReadInt32(),
+                hash = reader.ReadString(),
+                name = reader.ReadString(),
+                guid = reader.ReadGuid(),
+                ivLength = reader.ReadInt32(),
+            };
+            header.iv = reader.ReadBytes(header.ivLength);
+            return header;
+        }
+        
         #endregion
 
         #region  safeFile
