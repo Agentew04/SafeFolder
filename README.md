@@ -1,11 +1,11 @@
 # <div align="center">SafeFolder</div>
 <div align="center">
 
-![license](https://img.shields.io/github/license/Agentew04/SafeFolder)
-![downloads](https://img.shields.io/github/downloads/Agentew04/Safefolder/total)
+[![license](https://img.shields.io/github/license/Agentew04/SafeFolder)](https://github.com/Agentew04/SafeFolder/blob/main/LICENSE)
+[![downloads](https://img.shields.io/github/downloads/Agentew04/Safefolder/total)](https://github.com/Agentew04/SafeFolder/releases/latest)
 ![codesize](https://img.shields.io/github/languages/code-size/Agentew04/SafeFolder)
-![issues](https://img.shields.io/github/issues/Agentew04/SafeFolder)
-![pullrequests](https://img.shields.io/github/issues-pr/Agentew04/SafeFolder)
+[![issues](https://img.shields.io/github/issues/Agentew04/SafeFolder)](https://github.com/Agentew04/SafeFolder/issues)
+[![pullrequests](https://img.shields.io/github/issues-pr/Agentew04/SafeFolder)](https://github.com/Agentew04/SafeFolder/pulls)
 ![platform](https://img.shields.io/badge/Platform-Win%20%7C%20Linux%20%7C%20OSX-blue)
 ![architecture](https://img.shields.io/badge/Architecture-x64%20%7C%20x86%20%7C%20arm%20%7C%20arm64-orange)
 </div>

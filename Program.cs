@@ -64,7 +64,6 @@ public static class Program
 
         var state = Utils.GetStateFromSafeFile();
         var key = Utils.CreateKey(hashFile, pwd);
-        var isSuccess = true;
         if (!state)
         {
             // have to encrypt
