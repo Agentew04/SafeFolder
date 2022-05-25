@@ -6,10 +6,9 @@ namespace SafeFolder;
 [Serializable]
 public class Header
 {
-    public int size { get; set; }
-    public string hash { get; set; }
-    public string name { get; set; }
-    public Guid guid { get; set; }
-    public int ivLength { get; set; }
-    public byte[] iv { get; set; }
+    public string Hash { get; set; }
+    public string Name { get; set; }
+    public Guid Guid { get; set; }
+    public int IvLength { get; set; }
+    public byte[] Iv { get; set; }
 }

@@ -69,7 +69,7 @@ public static class Program
             // have to encrypt
             Utils.WriteLine("Encrypting files...", ConsoleColor.Green);
             Utils.SetFilesToSafeFile();
-            await Engine.PackFiles(key);
+            await Engine.PackFiles(key, hashFile);
             await Engine.PackFolders(key);
 
             Utils.SetStateToSafeFile(true); 
@@ -77,8 +77,8 @@ public static class Program
         else{
             // have to decrypt
             Utils.WriteLine("Decrypting files...", ConsoleColor.Green);
-            await Engine.UnpackFiles(key);
-            await Engine.UnpackFolders(key);
+            Engine.UnpackFiles(key, hashFile);
+            Engine.UnpackFolders(key);
 
             Utils.SetStateToSafeFile(false);
         }

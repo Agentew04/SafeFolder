@@ -177,12 +177,11 @@ namespace SafeFolder
         /// <param name="header">The header object</param>
         public static void Write(this BinaryWriter writer, Header header)
         {
-            writer.Write(header.size);
-            writer.Write(header.hash);
-            writer.Write(header.name);
-            writer.Write(header.guid);
-            writer.Write(header.ivLength);
-            writer.Write(header.iv);
+            writer.Write(header.Hash);
+            writer.Write(header.Name);
+            writer.Write(header.Guid);
+            writer.Write((byte)header.IvLength);
+            writer.Write(header.Iv);
         }
         
         /// <summary>
@@ -194,13 +193,12 @@ namespace SafeFolder
         {
             var header = new Header
             {
-                size = reader.ReadInt32(),
-                hash = reader.ReadString(),
-                name = reader.ReadString(),
-                guid = reader.ReadGuid(),
-                ivLength = reader.ReadInt32(),
+                Hash = reader.ReadString(),
+                Name = reader.ReadString(),
+                Guid = reader.ReadGuid(),
+                IvLength = reader.ReadByte(),
             };
-            header.iv = reader.ReadBytes(header.ivLength);
+            header.Iv = reader.ReadBytes(header.IvLength);
             return header;
         }
         
