@@ -113,8 +113,8 @@ public static class Engine
     {
         var files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
             .Where(f => !f.EndsWith(_safeFolderName) && !f.EndsWith($"{_safeFolderName}.exe")
-                             && !f.EndsWith(".safe"));
-        await Parallel.ForEachAsync(files, async (f, _) => await PackSingleFile(key, pwdHash, f));
+                             && !f.EndsWith(".pdb") && !f.EndsWith(".safe"));
+        await Parallel.ForEachAsync(files, async (f, _) => await PackSingleFile(key, pwdHash, Path.GetFileName(f)));
     }
 
     private static /*async Task*/ void UnpackSingleFile(byte[] key, string pwdHash, string file)
