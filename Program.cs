@@ -33,9 +33,9 @@ public static class Program
             // Engine.UnpackFolders(key);
         }
         stopWatch.Stop();
-        var ms = stopWatch.Elapsed.Milliseconds;
-        var s = stopWatch.Elapsed.Seconds;
-        var m = stopWatch.Elapsed.Minutes;
+        var ms = (stopWatch.Elapsed.Milliseconds).ToString("D3");
+        var s = (stopWatch.Elapsed.Seconds).ToString("D2");
+        var m = (stopWatch.Elapsed.Minutes).ToString("D2");
 
         Utils.WriteLine($"Done in {m}:{s}:{ms}!", ConsoleColor.Green);
         Console.WriteLine("Press any key to close the program.");
