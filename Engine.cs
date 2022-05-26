@@ -132,14 +132,14 @@ public static class Engine
         //await Parallel.ForEachAsync(files, async (f, _) => await PackSingleFile(key, pwdHash, Path.GetFileName(f)));
     }
 
-    private static /*async Task*/ void UnpackSingleFile(byte[] key, string pwdHash, string file, string pwd)
+    private static /*async Task*/ void UnpackSingleFile(byte[] key, string pwdHash, string file)
     {
         #region header
         var guidFileName = Guid.Parse(Path.GetFileName(file).Replace(".enc", ""));
         /*await*/ using var inStream = new FileStream(file, FileMode.Open, FileAccess.Read);
         using var br = new BinaryReader(inStream);
         var header = br.ReadHeader();
-        if(header.Guid != guidFileName || !Utils.CheckHash(pwd, header.Hash))
+        if(header.Guid != guidFileName || !Utils.CheckHash(Utils.HashBytes(key), header.Hash))
         {
             Utils.WriteLine($"Wrong password or file corrupted ({file})", ConsoleColor.Red);
             throw new Exception("Wrong password or file corrupted");
@@ -167,11 +167,11 @@ public static class Engine
         int bytesRead;
         while ((bytesRead = cryptoStream.Read(buffer)) > 0)
             outStream.Write(buffer[..bytesRead]);
-            
+
         #endregion
     }
 
-    public static /*async Task*/ void UnpackFiles(byte[] key, string pwdHash, string pwd)
+    public static /*async Task*/ void UnpackFiles(byte[] key, string pwdHash)
     {
         var files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
             .Where(f => f.EndsWith(".enc"));
@@ -181,7 +181,7 @@ public static class Engine
 
         foreach (var file in files)
         {
-            /*await*/ UnpackSingleFile(key, pwdHash, file, pwd);
+            /*await*/ UnpackSingleFile(key, pwdHash, file);
             File.Delete(file);
         }
 

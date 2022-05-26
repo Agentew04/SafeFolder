@@ -156,22 +156,14 @@ namespace SafeFolder
         /// </summary>
         /// <param name="stream">The binary stream</param>
         /// <param name="guid">The <see cref="Guid"/> to be written</param>
-        private static void Write(this BinaryWriter stream, Guid guid)
-        {
-            var bytes = guid.ToByteArray();
-            stream.Write(bytes);
-        }
+        private static void Write(this BinaryWriter stream, Guid guid) => stream.Write(guid.ToByteArray());
 
         /// <summary>
         /// Reads a guid from a binary stream
         /// </summary>
         /// <param name="stream">The binary stream</param>
         /// <returns>The guid that has been read</returns>
-        private static Guid ReadGuid(this BinaryReader stream)
-        {
-            var bytes = stream.ReadBytes(16);
-            return new Guid(bytes);
-        }
+        private static Guid ReadGuid(this BinaryReader stream) => new(stream.ReadBytes(16));
             
         /// <summary>
         /// Writes the file header to the stream
@@ -294,6 +286,13 @@ namespace SafeFolder
             var hash = Convert.ToBase64String(hashBytes);
 
             return hash;
+        }
+
+        public static byte[] HashBytes(byte[] bytes, HashAlgorithm hashAlgorithm) => hashAlgorithm.ComputeHash(bytes);
+        public static string HashBytes(byte[] bytes)
+        {
+            using var sha = SHA512.Create();
+            return Convert.ToHexString(sha.ComputeHash(bytes));
         }
         
         public static byte[] CreateKey(string hash, string password) => Convert.FromHexString(RawHash(hash + password));

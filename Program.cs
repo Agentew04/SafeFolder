@@ -15,9 +15,9 @@ public static class Program
         var pwd = Utils.GetPasswordInput("Enter password: ");
         var pwd2 = Utils.GetPasswordInput("Re-Enter password: ");
         if (pwd != pwd2) throw new Exception("Passwords do not match");
-        var pwdHash = Utils.GetHash(pwd);
-        // TODO check this
+
         var key = Utils.DeriveKeyFromString(pwd);
+        var pwdHash = Utils.GetHash(Utils.HashBytes(key));
         if (state == "1"){
             // have to encrypt
             stopWatch.Start();
@@ -28,7 +28,7 @@ public static class Program
             // have to decrypt
             stopWatch.Start();
             Utils.WriteLine("Decrypting files...", ConsoleColor.Green);
-            Engine.UnpackFiles(key, pwdHash, pwd);
+            Engine.UnpackFiles(key, pwdHash);
         }
         stopWatch.Stop();
         var ms = (stopWatch.Elapsed.Milliseconds).ToString("D3");
