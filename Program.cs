@@ -23,14 +23,12 @@ public static class Program
             stopWatch.Start();
             Utils.WriteLine("Encrypting files...", ConsoleColor.Green);
             await Engine.PackFiles(key, pwdHash);
-            // await Engine.PackFolders(key);
         }
         else{
             // have to decrypt
             stopWatch.Start();
             Utils.WriteLine("Decrypting files...", ConsoleColor.Green);
             Engine.UnpackFiles(key, pwdHash, pwd);
-            // Engine.UnpackFolders(key);
         }
         stopWatch.Stop();
         var ms = (stopWatch.Elapsed.Milliseconds).ToString("D3");
