@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
+using System.Text;
 
 namespace SafeFolder
 {
@@ -296,6 +297,24 @@ namespace SafeFolder
         }
         
         public static byte[] CreateKey(string hash, string password) => Convert.FromHexString(RawHash(hash + password));
+
+        /// <summary>
+        /// Creates a key based on one or two strings. String -> Byte[] uses UTF8
+        /// </summary>
+        /// <param name="input">The main input</param>
+        /// <param name="salt">The salt used. If <see langword="null"/>, the salt will be a empty array</param>
+        /// <returns>The Key derived</returns>
+        public static byte[] DeriveKeyFromString(string input, string? salt = null)
+        {
+            //get input bytes
+            byte[] inputbytes = Encoding.UTF8.GetBytes(input);
+            byte[] saltbytes;
+            if (salt != null) saltbytes = Encoding.UTF8.GetBytes(salt);
+            else saltbytes = new byte[16];
+            // Generate the hash
+            Rfc2898DeriveBytes pbkdf2 = new(inputbytes, saltbytes, iterations: 5000, HashAlgorithmName.SHA512);
+            return pbkdf2.GetBytes(32); //32 bytes length is 256 bits
+        }
 
         public static byte[] GenerateIv()
         {

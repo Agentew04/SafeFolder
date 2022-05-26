@@ -17,7 +17,7 @@ public static class Program
         if (pwd != pwd2) throw new Exception("Passwords do not match");
         var pwdHash = Utils.GetHash(pwd);
         // TODO check this
-        var key = Utils.CreateKey(pwd, pwd);
+        var key = Utils.DeriveKeyFromString(pwd);
         if (state == "1"){
             // have to encrypt
             stopWatch.Start();
