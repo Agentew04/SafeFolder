@@ -10,13 +10,14 @@ namespace SafeFolder{
         private const PaddingMode _paddingMode = PaddingMode.PKCS7;
         private const CipherMode _cipherMode = CipherMode.CBC;
 
-        internal static MemoryStream AesStreamEncrypt(Stream inStream, byte[] key, byte[] iv){
+        internal static void AesStreamEncrypt(Stream inStream, Stream outStream, byte[] key, byte[] iv){
+
             // validate parameters
             if (inStream == null)
                 throw new ArgumentNullException(nameof(inStream));
+            if( outStream == null)
+                throw new ArgumentNullException(nameof(outStream));
             
-            var bufferStream = new MemoryStream();
-
             using var aes = Aes.Create();
             aes.KeySize = _keySize;
             aes.BlockSize = _blockSize;
@@ -25,28 +26,38 @@ namespace SafeFolder{
             aes.Key = key;
             aes.IV = iv;
 
-            using var cs = new CryptoStream(bufferStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
+            using var ms = new MemoryStream();
+            using var cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write);
             
             Span<byte> buffer = stackalloc byte[1024];
             int data;
+            var count = 0;
             while ((data = inStream.Read(buffer)) > 0)
+            {
                 cs.Write(buffer.ToArray(), 0, data);
+                count++;
+            }
 
-            // seek back to the beginning
-            bufferStream.Seek(0, SeekOrigin.Begin);
-            var ms = new MemoryStream();
-            bufferStream.CopyTo(ms);
-            ms.Seek(0, SeekOrigin.Begin);
-            return ms;
+            ms.CopyTo(outStream);
+            outStream.Seek(-ms.Length, SeekOrigin.End);
         }
 
-        internal static MemoryStream AesStreamDecrypt(Stream inStream, byte[] key,byte[] iv){
+        /// <summary>
+        /// Decrypts the specified stream.
+        /// </summary>
+        /// <param name="inStream">The input stream. The data from current pos to end will be encrypted</param>
+        /// <param name="outStream">The output stream, stream is seeked initial position, hopefully</param>
+        /// <param name="key">The key to encrypt data with</param>
+        /// <param name="iv">The initialization vector that will be used</param>
+        /// <exception cref="ArgumentNullException">If any of the streams are null</exception>
+        internal static void AesStreamDecrypt(Stream inStream, Stream outStream, byte[] key,byte[] iv){
             // check for arguments
             if (inStream == null)
                 throw new ArgumentNullException(nameof(inStream));
-
-            var outputStream = new MemoryStream();
-            var aes = Aes.Create();
+            if( outStream == null)  
+                throw new ArgumentNullException(nameof(outStream));
+            
+            using var aes = Aes.Create();
             aes.KeySize = _keySize;
             aes.BlockSize = _blockSize;
             aes.Padding = _paddingMode;
@@ -54,7 +65,7 @@ namespace SafeFolder{
             aes.Key = key;
             aes.IV = iv;
             
-            var cs = new CryptoStream(inStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
+            using var cs = new CryptoStream(inStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
             // Span<byte> buffer = stackalloc byte[1024];
             // int bytesRead;
             // while ((bytesRead = cs.Read(buffer)) > 0)
@@ -62,14 +73,15 @@ namespace SafeFolder{
             
             //single byte read
             int data;
-            while ((data=cs.ReadByte()) != -1)
-                outputStream.WriteByte((byte)data);
-            
+            var count = 0;
+            while ((data = cs.ReadByte()) != -1)
+            {
+                outStream.WriteByte((byte)data);
+                count++;
+            }
+
             // seek back to the beginning
-            outputStream.Seek(0, SeekOrigin.Begin);
-            aes.Dispose();
-            cs.Dispose();
-            return outputStream;
+            outStream.Seek(-count, SeekOrigin.End);
 
             /*if(inStream == null)
                 throw new ArgumentNullException(nameof(inStream));

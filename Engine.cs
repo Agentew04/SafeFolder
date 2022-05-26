@@ -12,6 +12,11 @@ namespace SafeFolder;
 
 public static class Engine
 {
+    private const int _keySize = 256;
+    private const int _blockSize = 128;
+    private const PaddingMode _paddingMode = PaddingMode.PKCS7;
+    private const CipherMode _cipherMode = CipherMode.CBC;
+    
     private static readonly string _safeFolderName = Process.GetCurrentProcess().ProcessName;
     
     // TODO fix this folders
@@ -79,8 +84,9 @@ public static class Engine
 
     #region Files
 
-    private static async Task PackSingleFile(byte[] key, string pwdHash, string file)
+    private static void PackSingleFile(byte[] key, string pwdHash, string file)
     {
+        #region header
         var iv = Utils.GenerateIv();
         var guid = Guid.NewGuid();
         var encFile = guid.ToString().Replace("-", "") + ".enc";
@@ -91,22 +97,33 @@ public static class Engine
             IvLength = iv.Length,
             Iv = iv
         };
-        // write header to a stream
-        using var ms = new MemoryStream();
-        await using var bw = new BinaryWriter(ms);
+        #endregion
+
+        #region stream init
+        using var outStream = File.Create(encFile);
+        using var inStream = File.OpenRead(file);
+        using var bw = new BinaryWriter(outStream);
         bw.Write(header);
-        ms.Seek(0, SeekOrigin.Begin);
+        #endregion
 
-            
-        await using var fs = new FileStream(file, FileMode.Open, FileAccess.Read);
-        using var outStream = Encryptor.AesStreamEncrypt(fs, key, iv);
+        #region cryptography
+        using var aes = Aes.Create();
+        aes.KeySize = _keySize;
+        aes.BlockSize = _blockSize;
+        aes.Padding = _paddingMode;
+        aes.Mode = _cipherMode;
+        aes.Key = key;
+        aes.IV = iv;
+        
+        using var cryptoStream = new CryptoStream(outStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
+        Span<byte> buffer = stackalloc byte[1024];
+        int bytesRead;
+        while ( (bytesRead= inStream.Read(buffer)) > 0)
+        {
+            cryptoStream.Write(buffer[..bytesRead]);
+        }
 
-        await using var outFs = File.Create(encFile);
-        await ms.CopyToAsync(outFs);
-        await outStream.CopyToAsync(outFs);
-
-        fs.Close();
-        try {File.Delete(file);} catch (Exception){ }
+        #endregion
     }
     
     public static async Task PackFiles(byte[] key, string pwdHash)
@@ -114,31 +131,50 @@ public static class Engine
         var files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
             .Where(f => !f.EndsWith(_safeFolderName) && !f.EndsWith($"{_safeFolderName}.exe")
                              && !f.EndsWith(".pdb") && !f.EndsWith(".safe"));
-        await Parallel.ForEachAsync(files, async (f, _) => await PackSingleFile(key, pwdHash, Path.GetFileName(f)));
+        foreach (var file in files)
+        {
+            PackSingleFile(key, pwdHash, Path.GetFileName(file));
+            File.Delete(file);
+        }
+        //await Parallel.ForEachAsync(files, async (f, _) => await PackSingleFile(key, pwdHash, Path.GetFileName(f)));
     }
 
     private static /*async Task*/ void UnpackSingleFile(byte[] key, string pwdHash, string file)
     {
-        // get header, decrypt, delete encrypted file
-        var fileInfo = new FileInfo(file);
-        var guidFileName = Guid.Parse(fileInfo.Name.Replace(".enc", ""));
-        /*await*/ using var fs = new FileStream(file, FileMode.Open, FileAccess.Read);
-        using var br = new BinaryReader(fs);
+        #region header
+        var guidFileName = Guid.Parse(Path.GetFileName(file).Replace(".enc", ""));
+        /*await*/ using var inStream = new FileStream(file, FileMode.Open, FileAccess.Read);
+        using var br = new BinaryReader(inStream);
         var header = br.ReadHeader();
         if(header.Guid != guidFileName || header.Hash != pwdHash)
         {
-            Utils.WriteLine($"Wrong password or file corrupted ({fileInfo.Name})", ConsoleColor.Red);
+            Utils.WriteLine($"Wrong password or file corrupted ({file})", ConsoleColor.Red);
             return;
         }
-        var iv = header.Iv;
-        var decryptedFileName = header.Name;
-        
-        using var decStream = Encryptor.AesStreamDecrypt(fs, key, iv);
-        /*await*/ using var decFs = File.Create(decryptedFileName);
-        
-        /*await*/ decStream.CopyToAsync(decFs);
-        fs.Close();
-        File.Delete(file);
+        #endregion
+
+        #region init stream
+
+        /*await*/ using var outStream = File.Create(header.Name);
+
+        #endregion
+
+        #region criptography
+
+        using var aes = Aes.Create();
+        aes.KeySize = _keySize;
+        aes.BlockSize = _blockSize;
+        aes.Padding = _paddingMode;
+        aes.Mode = _cipherMode;
+        aes.Key = key;
+        aes.IV = header.Iv;
+            
+        using var cryptoStream = new CryptoStream(inStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
+        Span<byte> buffer = stackalloc byte[1024];
+        int bytesRead;
+        while ((bytesRead = cryptoStream.Read(buffer)) > 0)
+            outStream.Write(buffer[..bytesRead]);
+        #endregion
     }
 
     public static /*async Task*/ void UnpackFiles(byte[] key, string pwdHash)
@@ -149,8 +185,10 @@ public static class Engine
         foreach (var file in files)
         {
             /*await*/ UnpackSingleFile(key,pwdHash, file);
+            File.Delete(file);
         }
         //await Parallel.ForEachAsync(files, async (f, _) => await UnpackSingleFile(key, pwdHash, f));
     }
+    
     #endregion
 }

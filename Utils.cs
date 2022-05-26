@@ -180,7 +180,7 @@ namespace SafeFolder
             writer.Write(header.Hash);
             writer.Write(header.Name);
             writer.Write(header.Guid);
-            writer.Write((byte)header.IvLength);
+            writer.Write(header.IvLength);
             writer.Write(header.Iv);
         }
         
@@ -196,7 +196,7 @@ namespace SafeFolder
                 Hash = reader.ReadString(),
                 Name = reader.ReadString(),
                 Guid = reader.ReadGuid(),
-                IvLength = reader.ReadByte(),
+                IvLength = reader.ReadInt32(),
             };
             header.Iv = reader.ReadBytes(header.IvLength);
             return header;
