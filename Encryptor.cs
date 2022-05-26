@@ -7,7 +7,7 @@ namespace SafeFolder{
     {
         private const int _keySize = 256;
         private const int _blockSize = 128;
-        private const PaddingMode _paddingMode = PaddingMode.None;
+        private const PaddingMode _paddingMode = PaddingMode.PKCS7;
         private const CipherMode _cipherMode = CipherMode.CBC;
 
         internal static MemoryStream AesStreamEncrypt(Stream inStream, byte[] key, byte[] iv){
@@ -28,8 +28,9 @@ namespace SafeFolder{
             using var cs = new CryptoStream(bufferStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
             
             Span<byte> buffer = stackalloc byte[1024];
-            while (inStream.Read(buffer) > 0)
-                cs.Write(buffer);
+            int data;
+            while ((data = inStream.Read(buffer)) > 0)
+                cs.Write(buffer.ToArray(), 0, data);
 
             // seek back to the beginning
             bufferStream.Seek(0, SeekOrigin.Begin);
@@ -45,7 +46,7 @@ namespace SafeFolder{
                 throw new ArgumentNullException(nameof(inStream));
 
             var outputStream = new MemoryStream();
-            using var aes = Aes.Create();
+            var aes = Aes.Create();
             aes.KeySize = _keySize;
             aes.BlockSize = _blockSize;
             aes.Padding = _paddingMode;
@@ -53,11 +54,11 @@ namespace SafeFolder{
             aes.Key = key;
             aes.IV = iv;
             
-            using var cs = new CryptoStream(inStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
-            Span<byte> buffer = stackalloc byte[1024];
+            var cs = new CryptoStream(inStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
+            // Span<byte> buffer = stackalloc byte[1024];
             // int bytesRead;
-            // while ( (bytesRead = cs.Read(buffer.ToArray(),0,buffer.Length)) > 0)
-            //     outputStream.Write(buffer.ToArray(),0, bytesRead);
+            // while ((bytesRead = cs.Read(buffer)) > 0)
+            //     outputStream.Write(buffer.ToArray(), 0, bytesRead);
             
             //single byte read
             int data;
@@ -66,6 +67,8 @@ namespace SafeFolder{
             
             // seek back to the beginning
             outputStream.Seek(0, SeekOrigin.Begin);
+            aes.Dispose();
+            cs.Dispose();
             return outputStream;
 
             /*if(inStream == null)
