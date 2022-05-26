@@ -8,79 +8,29 @@ public static class Program
 {
     private static async Task Main()
     {   
-        // get if .safe file is installed
-        if (!Installer.IsInstalled())
-        {
-            Utils.WriteLine("SafeFolder is not installed. Installing now.", ConsoleColor.Yellow);
-            var canProceed = Installer.Install();
-            if(!canProceed) {
-                Utils.WriteLine("SafeFolder installation failed.", ConsoleColor.Red);
-                Utils.WriteLine("Press any key to close...", ConsoleColor.Red);
-                return;
-            }
-        }
-        var hashFile = Utils.GetHashFromSafeFile();
-
-        if (string.IsNullOrWhiteSpace(hashFile))
-        {
-            if (!Utils.ShowCorrupt()) return;
-            hashFile = Utils.GetHashFromSafeFile();
-        }
-
         Utils.ShowSplashScreen();
-        
-        var pwd = Utils.GetPasswordInput("Enter password: ");
-            
-        var isValid = BCrypt.Net.BCrypt.Verify(pwd, hashFile);
-        if(!isValid){
-            Utils.WriteLine("Invalid password.", ConsoleColor.Red);
-
-            const int maxTry = 2; // 3 but user already used once
-            var tryCount = 0;
-            while (tryCount < maxTry)
-            {
-                pwd = Utils.GetPasswordInput("Enter password: ");
-                // pwdHash = Utils.GetHash(pwd);
-                // finalHash = Utils.GetHash(pwdHash + pwd);
-                isValid = BCrypt.Net.BCrypt.Verify(pwd, hashFile);
-                if (isValid) break;
-                Utils.WriteLine("Invalid password.", ConsoleColor.Red);
-                tryCount++;
-            }
-        }
-            
-        if (!isValid)
-        {
-            Utils.WriteLine("Too many invalid password attempts. Press any key to close.", ConsoleColor.Red);
-            Console.ReadKey(true);
-            return;
-        }
-            
-        // here we go
-        //from here, the password is correct
-        
+        var state = Console.ReadLine();
         var stopWatch = new Stopwatch();
-        stopWatch.Start();
 
-        var state = Utils.GetStateFromSafeFile();
-        var key = Utils.CreateKey(hashFile, pwd);
-        if (!state)
-        {
+        var pwd = Utils.GetPasswordInput("Enter password: ");
+        var pwd2 = Utils.GetPasswordInput("Re-Enter password: ");
+        if (pwd != pwd2) throw new Exception("Passwords do not match");
+        var pwdHash = Utils.GetHash(pwd);
+        // TODO check this
+        var key = Utils.CreateKey(pwd, pwd);
+        if (state == "1"){
             // have to encrypt
+            stopWatch.Start();
             Utils.WriteLine("Encrypting files...", ConsoleColor.Green);
-            Utils.SetFilesToSafeFile();
-            await Engine.PackFiles(key, hashFile);
-            await Engine.PackFolders(key);
-
-            Utils.SetStateToSafeFile(true); 
+            await Engine.PackFiles(key, pwdHash);
+            // await Engine.PackFolders(key);
         }
         else{
             // have to decrypt
+            stopWatch.Start();
             Utils.WriteLine("Decrypting files...", ConsoleColor.Green);
-            Engine.UnpackFiles(key, hashFile);
-            Engine.UnpackFolders(key);
-
-            Utils.SetStateToSafeFile(false);
+            Engine.UnpackFiles(key, pwdHash, pwd);
+            // Engine.UnpackFolders(key);
         }
         stopWatch.Stop();
         var ms = stopWatch.Elapsed.Milliseconds;

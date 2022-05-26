@@ -53,6 +53,8 @@ namespace SafeFolder
                    v0.1.0
 
 =============================================
+ - 1. Encrypt Files
+ - 2. Decrypt Files
 ");
         }
         
@@ -304,6 +306,9 @@ namespace SafeFolder
 
         public static string GetHash(string str){
             return BCrypt.Net.BCrypt.HashPassword(str);
+        }        
+        public static bool CheckHash(string password, string hash){
+            return BCrypt.Net.BCrypt.Verify(password, hash);
         }        
         private static string RawHash(string s){
             //sha256
