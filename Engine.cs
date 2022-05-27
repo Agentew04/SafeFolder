@@ -111,8 +111,7 @@ public static class Engine
     public static async Task PackFiles(byte[] key, string pwdHash)
     {
         var files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
-            .Where(f => !f.EndsWith(_safeFolderName) && !f.EndsWith($"{_safeFolderName}.exe") 
-            && !f.EndsWith(".pdb") && !f.EndsWith(".enc"));
+            .Where(f => !Path.GetFileName(f).Contains(_safeFolderName) && !f.EndsWith(".pdb") && !f.EndsWith(".enc"));
 
         var folders = Directory.GetDirectories(Directory.GetCurrentDirectory());
 
@@ -127,12 +126,18 @@ public static class Engine
             File.Delete(file);
         });
 
-        foreach (var folder in folders)
-        {
+        // foreach (var folder in folders)
+        // {
+        //     PackSingleFolder(key, pwdHash, Path.GetFileName(folder));
+        //     Directory.Delete(folder, true);
+        //     File.Delete(Path.GetFileName(folder) + ".zip");
+        // }
+
+        await Parallel.ForEachAsync(folders, async (folder, _) => {
             PackSingleFolder(key, pwdHash, Path.GetFileName(folder));
             Directory.Delete(folder, true);
             File.Delete(Path.GetFileName(folder) + ".zip");
-        }
+        });
     }
 
     private static void UnpackSingleFile(byte[] key, string pwdHash, string file)
@@ -193,16 +198,16 @@ public static class Engine
             File.Delete(file);
         });
 
-        foreach (var zip in zips)
-        {
-            ZipFile.ExtractToDirectory(zip, $"./{Path.GetFileName(zip).Replace(".zip", "")}");
-            File.Delete(zip);
-        }
-
-        // await Parallel.ForEachAsync(files, async (zip, _) => {
+        // foreach (var zip in zips)
+        // {
         //     ZipFile.ExtractToDirectory(zip, $"./{Path.GetFileName(zip).Replace(".zip", "")}");
         //     File.Delete(zip);
-        // });
+        // }
+
+        await Parallel.ForEachAsync(zips, async (zip, _) => {
+            ZipFile.ExtractToDirectory(zip, $"./{Path.GetFileName(zip).Replace(".zip", "")}");
+            File.Delete(zip);
+        });
     }
     
     #endregion
