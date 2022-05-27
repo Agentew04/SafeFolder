@@ -303,7 +303,7 @@ namespace SafeFolder
         /// <param name="input">The main input</param>
         /// <param name="salt">The salt used. If <see langword="null"/>, the salt will be a empty array</param>
         /// <returns>The Key derived</returns>
-        public static byte[] DeriveKeyFromString(string input, string? salt = null)
+        public static byte[] DeriveKeyFromString(string input, string salt = null)
         {
             //get input bytes
             byte[] inputbytes = Encoding.UTF8.GetBytes(input);

@@ -28,7 +28,7 @@ public static class Program
             // have to decrypt
             stopWatch.Start();
             Utils.WriteLine("Decrypting files...", ConsoleColor.Green);
-            Engine.UnpackFiles(key, pwdHash);
+            await Engine.UnpackFiles(key, pwdHash);
         }
         stopWatch.Stop();
         var ms = (stopWatch.Elapsed.Milliseconds).ToString("D3");
