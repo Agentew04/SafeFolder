@@ -116,11 +116,16 @@ public static class Engine
 
         var folders = Directory.GetDirectories(Directory.GetCurrentDirectory());
 
-        foreach (var file in files)
-        {
+        // foreach (var file in files)
+        // {
+        //     PackSingleFile(key, pwdHash, Path.GetFileName(file));
+        //     File.Delete(file);
+        // }
+
+        await Parallel.ForEachAsync(files, async (file, _) => {
             PackSingleFile(key, pwdHash, Path.GetFileName(file));
             File.Delete(file);
-        }
+        });
 
         foreach (var folder in folders)
         {
@@ -128,11 +133,9 @@ public static class Engine
             Directory.Delete(folder, true);
             File.Delete(Path.GetFileName(folder) + ".zip");
         }
-
-        //await Parallel.ForEachAsync(files, async (f, _) => await PackSingleFile(key, pwdHash, Path.GetFileName(f)));
     }
 
-    private static /*async Task*/ void UnpackSingleFile(byte[] key, string pwdHash, string file)
+    private static void UnpackSingleFile(byte[] key, string pwdHash, string file)
     {
         #region header
         var guidFileName = Guid.Parse(Path.GetFileName(file).Replace(".enc", ""));
@@ -171,7 +174,7 @@ public static class Engine
         #endregion
     }
 
-    public static /*async Task*/ void UnpackFiles(byte[] key, string pwdHash)
+    public static async Task UnpackFiles(byte[] key, string pwdHash)
     {
         var files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
             .Where(f => f.EndsWith(".enc"));
@@ -179,18 +182,27 @@ public static class Engine
         var zips = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
             .Where(f => f.EndsWith(".zip"));
 
-        foreach (var file in files)
-        {
-            /*await*/ UnpackSingleFile(key, pwdHash, file);
+        // foreach (var file in files)
+        // {
+        //     /*await*/ UnpackSingleFile(key, pwdHash, file);
+        //     File.Delete(file);
+        // }
+
+        await Parallel.ForEachAsync(files, async (file, _) => {
+            UnpackSingleFile(key, pwdHash, file);
             File.Delete(file);
-        }
+        });
 
         foreach (var zip in zips)
         {
             ZipFile.ExtractToDirectory(zip, $"./{Path.GetFileName(zip).Replace(".zip", "")}");
             File.Delete(zip);
         }
-        //await Parallel.ForEachAsync(files, async (f, _) => await UnpackSingleFile(key, pwdHash, f));
+
+        // await Parallel.ForEachAsync(files, async (zip, _) => {
+        //     ZipFile.ExtractToDirectory(zip, $"./{Path.GetFileName(zip).Replace(".zip", "")}");
+        //     File.Delete(zip);
+        // });
     }
     
     #endregion
