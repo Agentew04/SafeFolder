@@ -2,12 +2,13 @@
 <div align="center">
 
 [![license](https://img.shields.io/github/license/Agentew04/SafeFolder)](https://github.com/Agentew04/SafeFolder/blob/main/LICENSE)
-[![downloads](https://img.shields.io/github/downloads/Agentew04/Safefolder/total)](https://github.com/Agentew04/SafeFolder/releases/latest)
-![codesize](https://img.shields.io/github/languages/code-size/Agentew04/SafeFolder)
+[![downloads](https://img.shields.io/github/downloads/Agentew04/Safefolder/total)](https://github.com/Agentew04/SafeFolder/releases)
+[![code size](https://img.shields.io/github/languages/code-size/Agentew04/SafeFolder)](https://github.com/Agentew04/SafeFolder)
+[![lines of code](https://tokei.rs/b1/github/Agentew04/SafeFolder?category=code)](https://github.com/Agentew04/SafeFolder)
 [![issues](https://img.shields.io/github/issues/Agentew04/SafeFolder)](https://github.com/Agentew04/SafeFolder/issues)
-[![pullrequests](https://img.shields.io/github/issues-pr/Agentew04/SafeFolder)](https://github.com/Agentew04/SafeFolder/pulls)
-![platform](https://img.shields.io/badge/Platform-Win%20%7C%20Linux%20%7C%20OSX-blue)
-![architecture](https://img.shields.io/badge/Architecture-x64%20%7C%20x86%20%7C%20arm%20%7C%20arm64-orange)
+[![pull requests](https://img.shields.io/github/issues-pr/Agentew04/SafeFolder)](https://github.com/Agentew04/SafeFolder/pulls)
+[![platform](https://img.shields.io/badge/Platform-Win%20%7C%20Linux%20%7C%20OSX-blue)](https://github.com/Agentew04/SafeFolder/releases)
+[![architecture](https://img.shields.io/badge/Architecture-x64%20%7C%20x86%20%7C%20arm%20%7C%20arm64-orange)](https://github.com/Agentew04/SafeFolder/releases)
 </div>
 
 SafeFolder is a lightweight, open source and cross-platform application that focuses in securing your device through advanced and cutting edge technology.
