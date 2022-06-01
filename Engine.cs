@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PerrysNetConsole;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -108,12 +109,14 @@ public static class Engine
         #endregion
     }
     
-    public static async Task PackFiles(byte[] key, string pwdHash)
+    public static async Task PackFiles(byte[] key, string pwdHash, Progress prog)
     {
         var files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
             .Where(f => !Path.GetFileName(f).Contains(_safeFolderName) && !f.EndsWith(".pdb") && !f.EndsWith(".enc"));
 
         var folders = Directory.GetDirectories(Directory.GetCurrentDirectory());
+
+        double progress = 100.0/(files.Count() + folders.Count() == 0 ? 100 : files.Count() + folders.Count());
 
         // foreach (var file in files)
         // {
@@ -122,8 +125,17 @@ public static class Engine
         // }
 
         await Parallel.ForEachAsync(files, async (file, _) => {
-            PackSingleFile(key, pwdHash, Path.GetFileName(file));
-            File.Delete(file);
+            try{
+                PackSingleFile(key, pwdHash, Path.GetFileName(file));
+                File.Delete(file);
+                prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} encrypted successfully");
+                prog.Percentage += progress;
+            }catch (Exception e)
+            {
+                prog.Message(Message.LEVEL.ERROR, $"{e.Message}");
+                prog.Stop();
+                Console.WriteLine(e);
+            }
         });
 
         // foreach (var folder in folders)
@@ -134,13 +146,22 @@ public static class Engine
         // }
 
         await Parallel.ForEachAsync(folders, async (folder, _) => {
-            PackSingleFolder(key, pwdHash, Path.GetFileName(folder));
-            Directory.Delete(folder, true);
-            File.Delete(Path.GetFileName(folder) + ".zip");
+            try{
+                PackSingleFolder(key, pwdHash, Path.GetFileName(folder));
+                Directory.Delete(folder, true);
+                File.Delete(Path.GetFileName(folder) + ".zip");
+                prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} encrypted successfully");
+                prog.Percentage += progress;
+            }catch (Exception e)
+            {
+                prog.Message(Message.LEVEL.ERROR, $"{e.Message}");
+                prog.Stop();
+                Console.WriteLine(e);
+            }
         });
     }
 
-    private static void UnpackSingleFile(byte[] key, string pwdHash, string file)
+    private static void UnpackSingleFile(byte[] key, string pwdHash, string file, Progress prog)
     {
         #region header
         var guidFileName = Guid.Parse(Path.GetFileName(file).Replace(".enc", ""));
@@ -149,8 +170,10 @@ public static class Engine
         var header = br.ReadHeader();
         if(header.Guid != guidFileName || !Utils.CheckHash(Utils.HashBytes(key), header.Hash))
         {
-            Utils.WriteLine($"Wrong password or file corrupted ({file})", ConsoleColor.Red);
-            throw new Exception("Wrong password or file corrupted");
+            prog.Message(Message.LEVEL.WARN, $"Wrong password or file corrupted ({Path.GetFileName(file)})");
+            // Utils.WriteLine($"Wrong password or file corrupted ({file})", ConsoleColor.Red);
+            // throw new Exception("Wrong password or file corrupted");
+            return;
         }
         #endregion
 
@@ -177,15 +200,19 @@ public static class Engine
             outStream.Write(buffer[..bytesRead]);
 
         #endregion
+        inStream.Close();
+        File.Delete(file);
     }
 
-    public static async Task UnpackFiles(byte[] key, string pwdHash)
+    public static async Task UnpackFiles(byte[] key, string pwdHash, Progress prog)
     {
         var files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
             .Where(f => f.EndsWith(".enc"));
 
         var zips = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
             .Where(f => f.EndsWith(".zip"));
+
+        double progress = 100.0/(files.Count() == 0 ? 100 : files.Count() + zips.Count());
 
         // foreach (var file in files)
         // {
@@ -194,8 +221,16 @@ public static class Engine
         // }
 
         await Parallel.ForEachAsync(files, async (file, _) => {
-            UnpackSingleFile(key, pwdHash, file);
-            File.Delete(file);
+            try{
+                UnpackSingleFile(key, pwdHash, file, prog);
+                prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} decrypted successfully");
+                prog.Percentage += progress;
+            }catch (Exception e)
+            {
+                prog.Message(Message.LEVEL.ERROR, $"{e.Message}");
+                prog.Stop();
+                Console.WriteLine(e);
+            }
         });
 
         // foreach (var zip in zips)
@@ -205,8 +240,17 @@ public static class Engine
         // }
 
         await Parallel.ForEachAsync(zips, async (zip, _) => {
-            ZipFile.ExtractToDirectory(zip, $"./{Path.GetFileName(zip).Replace(".zip", "")}");
-            File.Delete(zip);
+            try{
+                ZipFile.ExtractToDirectory(zip, $"./{Path.GetFileName(zip).Replace(".zip", "")}");
+                File.Delete(zip);
+                prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(zip)} decrypted successfully");
+                prog.Percentage += progress;
+            }catch (Exception e)
+            {
+                prog.Message(Message.LEVEL.ERROR, $"{e.Message}");
+                prog.Stop();
+                Console.WriteLine(e);
+            }
         });
     }
     

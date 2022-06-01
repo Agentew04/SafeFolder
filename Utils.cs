@@ -54,8 +54,6 @@ namespace SafeFolder
                    v0.1.0
 
 =============================================
- - 1. Encrypt Files
- - 2. Decrypt Files
 ");
         }
         
