@@ -12,6 +12,8 @@ jobs:
           - os: windows-latest
             target: win-x86
           - os: windows-latest
+            target: win-x64
+          - os: windows-latest
             target: win-arm
           - os: ubuntu-latest
             target: linux-x64
