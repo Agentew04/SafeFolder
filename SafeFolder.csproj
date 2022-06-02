@@ -3,10 +3,12 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
+    <TrimmerDefaultAction>link</TrimmerDefaultAction>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="DotNetZip" Version="1.16.0" />
     <PackageReference Include="PerrysNetConsole" Version="2.1.0" />
+    <PackageReference Include="Sharprompt" Version="2.4.1" />
   </ItemGroup>
 </Project>

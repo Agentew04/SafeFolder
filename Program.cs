@@ -9,51 +9,48 @@ public static class Program
 {
     private static async Task Main()
     {   
-        Utils.ShowSplashScreen();
-        Prompt prompt = new Prompt()
-            {
-                AllowEmpty = false,
-                Prefix = "Choose your choice",
-                ValidateChoices = true,
-                ChoicesText = new () {
-                    { "1", "Encrypt Files" },
-                    { "2", "Encrypt Files and Clear Traces (Very Slow)"},
-                    { "3", "Decrypt Files" },
-                    { "4", "Info about program" }
-                }
-            };
+        bool method = false;
+        bool traces = false;
 
-        var state = prompt.DoPrompt();
+        Utils.ShowSplashScreen();
+
+        var state = Sharprompt.Prompt.Select("What do you want", new[] { "Encrypt Files", "Decrypt Files", "Info about program" });
+        if (state == "Info about program"){
+            Utils.WriteLine("SafeFolder alpha version");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to close the program.");
+            Console.ReadKey();
+            return;
+        }else if (state == "Encrypt Files"){
+            method = Sharprompt.Prompt.Confirm("Encrypt files in memory? (Fast, but demands more ram)");
+            // traces = Sharprompt.Prompt.Confirm("Clear traces? (Very Slow, but more secure)");
+        }else if (state == "Decrypt Files"){
+            method = Sharprompt.Prompt.Confirm("Decrypt files in memory? (Fast, but demands more ram)");
+        }
+
         var stopWatch = new Stopwatch();
         Progress prog = new Progress();
 
-        var pwd = Utils.GetPasswordInput("Enter password: ");
-        var pwd2 = Utils.GetPasswordInput("Re-Enter password: ");
+        var pwd = Sharprompt.Prompt.Password("Enter password", placeholder: "Take Care With CAPS-LOCK", validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
+        var pwd2 = Sharprompt.Prompt.Password("Re-Enter password", placeholder: "Take Care With CAPS-LOCK", validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
         if (pwd != pwd2) throw new Exception("Passwords do not match");
 
         var key = Utils.DeriveKeyFromString(pwd);
         var pwdHash = Utils.GetHash(Utils.HashBytes(key));
-        if (state == "1"){
+        if (state == "Encrypt Files"){
             // have to encrypt
             prog.Start();
             prog.Message(Message.LEVEL.INFO, "Encrypting files...");
             stopWatch.Start();
-            await Engine.PackFiles(key, pwdHash, prog);
-        }else if (state == "2"){
-            // have to encrypt
-            prog.Start();
-            prog.Message(Message.LEVEL.INFO, "Encrypting files...");
-            stopWatch.Start();
-            await Engine.PackFiles(key, pwdHash, prog);
-        }else if (state == "3"){
+            await Engine.PackFiles(key, pwdHash, prog, method, traces);
+        }else if (state == "Decrypt Files"){
             // have to decrypt
             prog.Start();
             prog.Message(Message.LEVEL.INFO, "Decrypting files...");
             stopWatch.Start();
-            await Engine.UnpackFiles(key, pwdHash, prog);
-        }else if (state == "4"){
-            Utils.WriteLine("SafeFolder");
+            await Engine.UnpackFiles(key, pwdHash, prog, method);
         }
+
         stopWatch.Stop();
         var ms = (stopWatch.Elapsed.Milliseconds).ToString("D3");
         var s = (stopWatch.Elapsed.Seconds).ToString("D2");
