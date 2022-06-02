@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 
 namespace SafeFolder;
 
@@ -7,6 +6,7 @@ namespace SafeFolder;
 public class Header
 {
     public string Hash { get; set; }
+    public bool IsFolder { get; set; }
     public string Name { get; set; }
     public Guid Guid { get; set; }
     public int IvLength { get; set; }

@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="DotNetZip" Version="1.16.0" />
     <PackageReference Include="PerrysNetConsole" Version="2.1.0" />
   </ItemGroup>
 </Project>
