@@ -2,42 +2,13 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using PerrysNetConsole;
 
 namespace SafeFolder
 {
     public static class Utils{
 
         #region IO
-
-        /// <summary>
-        /// Shows a prompt and gets a string from the user(formatted with *).
-        /// </summary>
-        /// <param name="prompt">The text to be shown</param>
-        /// <returns>The input the user typed</returns>
-        public static string GetPasswordInput(string prompt = "")
-        {
-            Console.Write(prompt);
-            var password = "";
-            ConsoleKeyInfo key;
-            do
-            {
-                key = Console.ReadKey(true);
-                if (key.Key != ConsoleKey.Backspace && key.Key != ConsoleKey.Enter)
-                {
-                    password += key.KeyChar;
-                    Console.Write("*");
-                }
-                else
-                {
-                    if (key.Key != ConsoleKey.Backspace || password.Length <= 0) continue;
-                    password = password[..^1]; // black magic, but it works
-                    Console.Write("\b \b");
-                }
-            }
-            while (key.Key != ConsoleKey.Enter);
-            Console.WriteLine();
-            return password;
-        }
 
         /// <summary>
         /// Shows the splash screen.
@@ -162,6 +133,58 @@ namespace SafeFolder
             return BCrypt.Net.BCrypt.Verify(password, hash);
         }
 
+        /// <summary>
+        /// Deletes a file in a secure way by overwriting it with
+        /// random garbage data n times.
+        /// </summary>
+        /// <param name="filename">Full path of the file to be deleted</param>
+        public static void WipeFile(string filename, Progress prog)
+        {
+            try
+            {
+                if (!File.Exists(filename)) return;
+                // Set the files attributes to normal in case it's read-only.
+                File.SetAttributes(filename, FileAttributes.Normal);
+
+                // Calculate the total number of sectors in the file.
+                var sectors = (int)Math.Ceiling(new FileInfo(filename).Length/512.0);
+                    
+                // Create a dummy-buffer the size of a sector.
+                var buffer = new byte[512];
+
+                // Open a FileStream to the file.
+                var inputStream = new FileStream(filename, FileMode.Open);
+
+                // Loop all sectors
+                for (var i = 0; i < sectors; i++)
+                {
+                    // write zeros
+                    inputStream.Write(buffer, 0, buffer.Length);
+                }
+                // truncate file
+                inputStream.SetLength(0);
+                // Close the stream.
+                inputStream.Close();
+
+                // wipe dates
+                var dt = new DateTime(2037, 1, 1, 0, 0, 0);
+                File.SetCreationTime(filename, dt);
+                File.SetLastAccessTime(filename, dt);
+                File.SetLastWriteTime(filename, dt);
+
+                File.SetCreationTimeUtc(filename, dt);
+                File.SetLastAccessTimeUtc(filename, dt);
+                File.SetLastWriteTimeUtc(filename, dt);
+
+                // Finally, delete the file
+                File.Delete(filename);
+            }
+            catch(Exception e)
+            {
+                prog.Message(Message.LEVEL.ERROR, "Error wiping file: " + e.Message);
+            }
+        }
+        
         #endregion
         
     }

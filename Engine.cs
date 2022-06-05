@@ -326,22 +326,6 @@ public static class Engine
 
             return ValueTask.CompletedTask;
         });
-
-
-        /*await Parallel.ForEachAsync(zips, async (zip, _) => {
-            try{
-                UnpackSingleFolder();
-                ZipFile.ExtractToDirectory(zip, $"./{Path.GetFileName(zip).Replace(".zip", "")}");
-                File.Delete(zip);
-                prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(zip)} decrypted successfully");
-                prog.Percentage += progress;
-            }catch (Exception e)
-            {
-                prog.Message(Message.LEVEL.ERROR, $"{e.Message}");
-                prog.Stop();
-                Console.WriteLine(e);
-            }
-        });*/
     }
     
     #endregion
