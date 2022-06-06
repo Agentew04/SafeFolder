@@ -168,10 +168,11 @@ public static class Engine
         {
             try{
                 PackSingleFile(key, pwdHash, Path.GetFileName(file));
-                File.Delete(file);
                 prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} encrypted successfully");
                 if (traces){
-                    prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} cleared traces successfully");
+                    Utils.WipeFile(file, prog);
+                }else{
+                    File.Delete(file);
                 }
                 prog.Percentage += progress;
             }catch (Exception e)
@@ -189,11 +190,13 @@ public static class Engine
         {
             try{
                 PackSingleFolder(key, pwdHash, Path.GetFileName(folder), method);
-                Directory.Delete(folder, true);
-                File.Delete(Path.GetFileName(folder) + ".zip");
                 prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} encrypted successfully");
                 if (traces){
-                    prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} cleared traces successfully");
+                    Utils.WipeFolder(folder, prog);
+                    Utils.WipeFile($"{folder}.zip", prog);
+                }else{
+                    Directory.Delete(folder, true);
+                    File.Delete(Path.GetFileName(folder) + ".zip");
                 }
                 prog.Percentage += progress;
             }catch (Exception e)
@@ -207,7 +210,7 @@ public static class Engine
         });
     }
 
-    private static void UnpackSingleFileOrFolder(byte[] key, string file, Progress prog, bool method)
+    private static void UnpackSingleFileOrFolder(byte[] key, string file, Progress prog, bool method, bool traces)
     {
         #region header
         var guidFileName = Guid.Parse(Path.GetFileName(file).Replace(".enc", ""));
@@ -291,16 +294,21 @@ public static class Engine
                 outStream.Close();
 
                 ZipFile.ExtractToDirectory($"{header.Name}.zip", "./");
-                File.Delete($"{header.Name}.zip");
+
+                if(traces){
+                    Utils.WipeFile($"{header.Name}.zip", prog);
+                }else{
+                    File.Delete($"{header.Name}.zip");
+                }
             }
         }
         File.Delete(file);
         prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} decrypted successfully");
-        #endregion
         
+        #endregion
     }
 
-    public static async Task UnpackFiles(byte[] key, string pwdHash, Progress prog, bool method)
+    public static async Task UnpackFiles(byte[] key, string pwdHash, Progress prog, bool method, bool traces)
     {
         var files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
             .Where(f => f.EndsWith(".enc")).ToList();
@@ -315,7 +323,7 @@ public static class Engine
         await Parallel.ForEachAsync(files, (file, _) =>
         {
             try{
-                UnpackSingleFileOrFolder(key, file, prog, method);
+                UnpackSingleFileOrFolder(key, file, prog, method, traces);
                 prog.Percentage += progress;
             }catch (Exception e)
             {

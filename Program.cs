@@ -19,15 +19,18 @@ public static class Program
         switch (state)
         {
             case "Info about program":
-                Utils.WriteLine("SafeFolder alpha version\n\n");
+                Utils.WriteLine("SafeFolder alpha version\n");
+                Utils.ShowInfoScreen();
                 Console.WriteLine("Press any key to close the program.");
                 Console.ReadKey();
                 return;
             case "Encrypt Files":
                 method = Prompt.Confirm("Encrypt files in memory? (Fast, but demands more ram)");
+                traces = Prompt.Confirm("Clear traces? (Very Slow, but more secure)");
                 break;
             case "Decrypt Files":
                 method = Prompt.Confirm("Decrypt files in memory? (Fast, but demands more ram)");
+                traces = Prompt.Confirm("Clear traces? (Very Slow, but more secure)");
                 break;
         }
 
@@ -54,7 +57,7 @@ public static class Program
                 prog.Start();
                 prog.Message(Message.LEVEL.INFO, "Decrypting files...");
                 stopWatch.Start();
-                await Engine.UnpackFiles(key, pwdHash, prog, method);
+                await Engine.UnpackFiles(key, pwdHash, prog, method, traces);
                 break;
         }
 

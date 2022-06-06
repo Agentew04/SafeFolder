@@ -26,6 +26,23 @@ namespace SafeFolder
         }
 
         /// <summary>
+        /// Shows the info screen.
+        /// </summary>
+        public static void ShowInfoScreen()
+        {
+            Console.WriteLine(@"
+Encrypt/Decrypt files in memory: Fast, but demands more ram.
+Clear traces: Very Slow, but more secure.
+
+Encrypt/Decrypt files in memory:
+    - Encrypt/Decrypt the folder in memory for more speed.
+
+Clear traces:
+    - Clears the traces of the files for impossible to recover the files.
+");
+        }
+
+        /// <summary>
         /// Writes a line to the console, with a color.
         /// </summary>
         /// <param name="message">The message, if not ends with \n, \n will be appended</param>
@@ -178,14 +195,56 @@ namespace SafeFolder
 
                 // Finally, delete the file
                 File.Delete(filename);
+
+                prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(filename)} cleared traces successfully");
             }
             catch(Exception e)
             {
-                prog.Message(Message.LEVEL.ERROR, "Error wiping file: " + e.Message);
+                prog.Message(Message.LEVEL.ERROR, $"Error wiping file ({Path.GetFileName(filename)})" + e.Message);
+            }
+        }
+
+        public static void WipeFolder(string folder, Progress prog)
+        {
+            try
+            {
+                if (!Directory.Exists(folder)) return;
+
+                var dir = new DirectoryInfo(folder);
+                var files = dir.GetFiles();
+                var dirs = dir.GetDirectories();
+
+                foreach (var file in files)
+                {
+                    WipeFile(file.FullName, prog);
+                }
+
+                foreach (var subdir in dirs)
+                {
+                    WipeFolder(subdir.FullName, prog);
+                }
+
+                // wipe dates
+                var dt = new DateTime(2037, 1, 1, 0, 0, 0);
+                Directory.SetCreationTime(folder, dt);
+                Directory.SetLastAccessTime(folder, dt);
+                Directory.SetLastWriteTime(folder, dt);
+
+                Directory.SetCreationTimeUtc(folder, dt);
+                Directory.SetLastAccessTimeUtc(folder, dt);
+                Directory.SetLastWriteTimeUtc(folder, dt);
+
+                // Finally, delete the folder
+                Directory.Delete(folder, true);
+
+                prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} cleared traces successfully");
+            }
+            catch(Exception e)
+            {
+                prog.Message(Message.LEVEL.ERROR, $"Error wiping folder ({Path.GetFileName(folder)})" + e.Message);
             }
         }
         
         #endregion
-        
     }
 }
