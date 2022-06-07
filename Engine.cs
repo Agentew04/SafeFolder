@@ -66,7 +66,7 @@ public static class Engine
         if (method){
             var dirInfo = new DirectoryInfo(folder);
             using var ms = new MemoryStream();
-            using var zip = new Ionic.Zip.ZipFile();
+            using var zip = new Ionic.Zip.ZipFile(encoding: System.Text.Encoding.UTF8);
 
             zip.AddDirectory(folder, dirInfo.Name);
             zip.Save(ms);
