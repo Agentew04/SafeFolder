@@ -33,7 +33,7 @@ we use a very secure method called _hashing_, that prevents attackers from rever
 ## TODOs
 
 - [x] Protecting you data 🔒✔
-- [ ] Faster zipping algorithm 🏃
+- [x] Faster zipping algorithm 🏃
 - [x] Add a Stopwatch ⌚
-- [ ] Progress Bar 📶
+- [x] Progress Bar 📶
 - [ ] Be more user friendly 😁
