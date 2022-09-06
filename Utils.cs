@@ -1,45 +1,14 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
-using System.Threading;
+using System.Text;
+using PerrysNetConsole;
 
 namespace SafeFolder
 {
     public static class Utils{
 
         #region IO
-
-        /// <summary>
-        /// Shows a prompt and gets a string from the user(formatted with *).
-        /// </summary>
-        /// <param name="prompt">The text to be shown</param>
-        /// <returns>The input the user typed</returns>
-        public static string GetPasswordInput(string prompt = "")
-        {
-            Console.Write(prompt);
-            var password = "";
-            ConsoleKeyInfo key;
-            do
-            {
-                key = Console.ReadKey(true);
-                if (key.Key != ConsoleKey.Backspace && key.Key != ConsoleKey.Enter)
-                {
-                    password += key.KeyChar;
-                    Console.Write("*");
-                }
-                else
-                {
-                    if (key.Key != ConsoleKey.Backspace || password.Length <= 0) continue;
-                    password = password[..^1]; // black magic, but it works
-                    Console.Write("\b \b");
-                }
-            }
-            while (key.Key != ConsoleKey.Enter);
-            Console.WriteLine();
-            return password;
-        }
 
         /// <summary>
         /// Shows the splash screen.
@@ -55,43 +24,33 @@ namespace SafeFolder
 =============================================
 ");
         }
-        
+
         /// <summary>
-        /// Shows the app corrupt message and reinstall the app.
+        /// Shows the info screen.
         /// </summary>
-        /// <returns></returns>
-        public static bool ShowCorrupt()
+        public static void ShowInfoScreen()
         {
             Console.WriteLine(@"
-=============================================
-                
-             _  
-           .' ) 
- ,.--.    / .'          Installation is corrupted
-//    \  / /    
-\\    / / /     
- `'--' . '      
- ,.--. | |      
-//    \' '      
-\\    / \ \             Try reinstalling SafeFolder
- `'--'   \ \    
-          \ '.  
-           '._)
-   
+Encrypt/Decrypt files in memory: Fast, but demands more ram.
 
-=============================================
+Encrypt/Decrypt files in memory:
+    - Uses the RAM memory to convert your files faster. Not recommended for big files as it might crash!
+Clear traces:
+    - Clear all traces of the files in the hard drive, making it impossible to recover them.
+
+Safe folder now has full CLI support! Flags are now available to use in the command line:
+    -n  --nogui               => Disable the GUI and use the command line interface. Must be included to use the CLI flags.
+    -h  --help                => Show this help screen.
+    -v  --version             => Display the current version of the program.
+    -m  --inmemory            => Encrypt/Decrypt files in memory.
+    -c  --cleartraces         => Clear traces of the files in the hard drive.
+    -e  --encrypt             => Encrypt the files.
+    -d  --decrypt             => Decrypt the files.
+    -p  --password <password> => Set the password to use.
+    -V  --verbosity <0|1>     => Sets the verbosity level of the program.
 ");
-            WriteLine("Press any key to Reinstall...", ConsoleColor.Yellow);
-            Console.ReadKey(true);
-            var canProceed = Installer.Install();
-            if(!canProceed) {
-                Utils.WriteLine("SafeFolder installation failed.", ConsoleColor.Red);
-                Utils.WriteLine("Press any key to close...", ConsoleColor.Red);
-                return false;
-            }
-            return true;
         }
-        
+
         /// <summary>
         /// Writes a line to the console, with a color.
         /// </summary>
@@ -111,64 +70,18 @@ namespace SafeFolder
         #region Binary
 
         /// <summary>
-        /// Writes a list of strings to a binary stream(writable)
-        /// </summary>
-        /// <param name="stream">The binaryWriter object</param>
-        /// <param name="strings">The list containing the strings</param>
-        public static void Write(this BinaryWriter stream, IEnumerable<string> strings)
-        {
-            // Write the number of strings
-            var stringsList = strings.ToList();
-            stream.Write(stringsList.Count);
-            
-            // Write each string
-            foreach (var str in stringsList)
-            {
-                stream.Write(str);
-            }
-        }
-
-        /// <summary>
-        /// Reads a list of strings written by <see cref="Write"/>
-        /// </summary>
-        /// <param name="stream">The stream containing the data</param>
-        /// <returns>An IEnumerable with the strings read</returns>
-        private static IEnumerable<string> ReadStrings(this BinaryReader stream)
-        {
-            var strings = new List<string>();
-            // Read the number of strings
-            var count = stream.ReadInt32();
-            
-            // Read each string
-            for (var i = 0; i < count; i++)
-            {
-                strings.Add(stream.ReadString());
-            }
-
-            return strings;
-        }
-
-        /// <summary>
         /// Writes a GUID bytes to a binary stream
         /// </summary>
         /// <param name="stream">The binary stream</param>
         /// <param name="guid">The <see cref="Guid"/> to be written</param>
-        private static void Write(this BinaryWriter stream, Guid guid)
-        {
-            var bytes = guid.ToByteArray();
-            stream.Write(bytes);
-        }
+        private static void Write(this BinaryWriter stream, Guid guid) => stream.Write(guid.ToByteArray());
 
         /// <summary>
         /// Reads a guid from a binary stream
         /// </summary>
         /// <param name="stream">The binary stream</param>
         /// <returns>The guid that has been read</returns>
-        private static Guid ReadGuid(this BinaryReader stream)
-        {
-            var bytes = stream.ReadBytes(16);
-            return new Guid(bytes);
-        }
+        private static Guid ReadGuid(this BinaryReader stream) => new(stream.ReadBytes(16));
             
         /// <summary>
         /// Writes the file header to the stream
@@ -177,12 +90,12 @@ namespace SafeFolder
         /// <param name="header">The header object</param>
         public static void Write(this BinaryWriter writer, Header header)
         {
-            writer.Write(header.size);
-            writer.Write(header.hash);
-            writer.Write(header.name);
-            writer.Write(header.guid);
-            writer.Write(header.ivLength);
-            writer.Write(header.iv);
+            writer.Write(header.Hash);
+            writer.Write(header.IsFolder);
+            writer.Write(header.Name);
+            writer.Write(header.Guid);
+            writer.Write(header.IvLength);
+            writer.Write(header.Iv);
         }
         
         /// <summary>
@@ -194,128 +107,158 @@ namespace SafeFolder
         {
             var header = new Header
             {
-                size = reader.ReadInt32(),
-                hash = reader.ReadString(),
-                name = reader.ReadString(),
-                guid = reader.ReadGuid(),
-                ivLength = reader.ReadInt32(),
+                Hash = reader.ReadString(),
+                IsFolder = reader.ReadBoolean(),
+                Name = reader.ReadString(),
+                Guid = reader.ReadGuid(),
+                IvLength = reader.ReadInt32(),
             };
-            header.iv = reader.ReadBytes(header.ivLength);
+            header.Iv = reader.ReadBytes(header.IvLength);
             return header;
         }
         
         #endregion
-
-        #region  safeFile
-        
-        private static readonly string _currentPath = Environment.CurrentDirectory;
-        private static readonly string _safeFilePath = $"{_currentPath}/.safe";
-        
-        public static bool GetStateFromSafeFile()
-        {
-            using var binaryReader = new BinaryReader(File.OpenRead(_safeFilePath));
-            var state = binaryReader.ReadBoolean();
-            return state;
-        }
-        public static void SetStateToSafeFile(bool state)
-        {
-            using var binaryWriter = new BinaryWriter(File.OpenWrite(_safeFilePath));
-            binaryWriter.Write(state);
-        }
-        
-        public static string GetHashFromSafeFile()
-        {
-            try {
-                using var binaryReader = new BinaryReader(File.OpenRead(_safeFilePath));
-                _ = binaryReader.ReadBoolean();
-                var hash = binaryReader.ReadString();
-                return hash;
-            } catch (Exception) {
-                return "";
-            }
-        }
-
-        public static IEnumerable<string> GetFilesFromSafeFile()
-        {
-            using var binaryReader = new BinaryReader(File.OpenRead(_safeFilePath));
-            _ = binaryReader.ReadBoolean();
-            _ = binaryReader.ReadString();
-            var files = binaryReader.ReadStrings();
-            return files;
-        }
-
-        public static void SetFilesToSafeFile()
-        {
-            var hash = GetHashFromSafeFile();
-            var iv = Utils.GenerateIv();
-
-            using var binaryWriter = new BinaryWriter(File.OpenWrite(_safeFilePath));
-            binaryWriter.Write(false);
-            binaryWriter.Write(hash);
-            binaryWriter.Write(Installer.GetFiles());
-            binaryWriter.Write(Installer.GetFolders());
-            binaryWriter.Write(iv.Length);
-            binaryWriter.Write(iv);
-        }
-        
-        public static IEnumerable<string> GetFoldersFromSafeFile()
-        {
-            using var binaryReader = new BinaryReader(File.OpenRead(_safeFilePath));
-            _ = binaryReader.ReadBoolean();
-            _ = binaryReader.ReadString();
-            _ = binaryReader.ReadStrings();
-            var folders = binaryReader.ReadStrings();
-            return folders;
-        }
-        
-        public static byte[] GetIvFromSafeFile()
-        {
-            using var binaryReader = new BinaryReader(File.OpenRead(_safeFilePath));
-            _ = binaryReader.ReadBoolean();
-            _ = binaryReader.ReadString();
-            _ = binaryReader.ReadStrings();
-            _ = binaryReader.ReadStrings();
-            var length = binaryReader.ReadInt32();
-            var iv = binaryReader.ReadBytes(length);
-            return iv;
-        }
-
-        
-        #endregion
         
         #region Cryptography
-
-        public static string HashFile(string path){
-            //hash file
-            using var fs = File.OpenRead(path);
-            using var sha = SHA256.Create();
-            var hashBytes = sha.ComputeHash(fs);
-            var hash = Convert.ToBase64String(hashBytes);
-
-            return hash;
+        public static string HashBytes(byte[] bytes)
+        {
+            using var sha = SHA512.Create();
+            return Convert.ToHexString(sha.ComputeHash(bytes));
         }
-        
-        public static byte[] CreateKey(string hash, string password) => Convert.FromHexString(RawHash(hash + password));
 
+        /// <summary>
+        /// Creates a key based on one or two strings. String -> Byte[] uses UTF8
+        /// </summary>
+        /// <param name="input">The main input</param>
+        /// <param name="salt">The salt used. If <see langword="null"/>, the salt will be a empty array</param>
+        /// <returns>The Key derived</returns>
+        public static byte[] DeriveKeyFromString(string input, string? salt = null)
+        {
+            //get input bytes
+            byte[] inputBytes = Encoding.UTF8.GetBytes(input);
+            byte[] saltBytes = salt != null ? Encoding.UTF8.GetBytes(salt) : new byte[16];
+            // Generate the hash
+            Rfc2898DeriveBytes pbkdf2 = new(inputBytes, saltBytes, iterations: 5000, HashAlgorithmName.SHA512);
+            return pbkdf2.GetBytes(32); //32 bytes length is 256 bits
+        }
+
+        /// <summary>
+        /// Generates a random iv for AES
+        /// </summary>
+        /// <returns>The IV that has been generated</returns>
         public static byte[] GenerateIv()
         {
             //generate random IV
             using var aes = Aes.Create();
             return aes.IV;
         }
-
         public static string GetHash(string str){
             return BCrypt.Net.BCrypt.HashPassword(str);
         }        
-        private static string RawHash(string s){
-            //sha256
-            var sha256 = SHA256.Create();
-            var bytes = System.Text.Encoding.UTF8.GetBytes(s);
-            var hash = sha256.ComputeHash(bytes);
-            return BitConverter.ToString(hash).Replace("-", "").ToLower();
+        public static bool CheckHash(string password, string hash){
+            return BCrypt.Net.BCrypt.Verify(password, hash);
         }
 
-        #endregion
         
+        /// <summary>
+        /// Deletes a file in a secure way by overwriting it with
+        /// random garbage data n times.
+        /// </summary>
+        /// <param name="prog">The progessbar object, null if it's on a cli run</param>
+        /// <param name="filename">Full path of the file to be deleted</param>
+        public static void WipeFile(string filename, Progress? prog) {
+            bool verbose = prog is not null;
+            try
+            {
+                if (!File.Exists(filename)) return;
+                // Set the files attributes to normal in case it's read-only.
+                File.SetAttributes(filename, FileAttributes.Normal);
+
+                // Calculate the total number of sectors in the file.
+                var sectors = (int)Math.Ceiling(new FileInfo(filename).Length/512.0);
+                    
+                // Create a dummy-buffer the size of a sector.
+                var buffer = new byte[512];
+
+                // Open a FileStream to the file.
+                var inputStream = new FileStream(filename, FileMode.Open);
+
+                // Loop all sectors
+                for (var i = 0; i < sectors; i++)
+                {
+                    // write zeros
+                    inputStream.Write(buffer, 0, buffer.Length);
+                }
+                // truncate file
+                inputStream.SetLength(0);
+                // Close the stream.
+                inputStream.Close();
+
+                // wipe dates
+                var dt = new DateTime(2037, 1, 1, 0, 0, 0);
+                File.SetCreationTime(filename, dt);
+                File.SetLastAccessTime(filename, dt);
+                File.SetLastWriteTime(filename, dt);
+
+                File.SetCreationTimeUtc(filename, dt);
+                File.SetLastAccessTimeUtc(filename, dt);
+                File.SetLastWriteTimeUtc(filename, dt);
+
+                // Finally, delete the file
+                File.Delete(filename);
+
+                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(filename)} cleared traces successfully");
+            }
+            catch(Exception e) {
+                if (verbose)
+                    prog?.Message(Message.LEVEL.ERROR, $"Error wiping file ({Path.GetFileName(filename)})" + e.Message);
+                else
+                    WriteLine($"Error wiping file ({Path.GetFileName(filename)}): {e.Message}", ConsoleColor.Red);
+            }
+        }
+
+        public static void WipeFolder(string folder, Progress? prog)
+        {
+            try
+            {
+                if (!Directory.Exists(folder)) 
+                    return;
+
+                DirectoryInfo dir = new(folder);
+                FileInfo[] files = dir.GetFiles();
+                DirectoryInfo[] dirs = dir.GetDirectories();
+
+                foreach (FileInfo file in files)
+                {
+                    WipeFile(file.FullName, prog);
+                }
+
+                foreach (DirectoryInfo subDir in dirs)
+                {
+                    WipeFolder(subDir.FullName, prog);
+                }
+
+                // wipe dates
+                DateTime dt = new DateTime(2037, 1, 1, 0, 0, 0);
+                Directory.SetCreationTime(folder, dt);
+                Directory.SetLastAccessTime(folder, dt);
+                Directory.SetLastWriteTime(folder, dt);
+
+                Directory.SetCreationTimeUtc(folder, dt);
+                Directory.SetLastAccessTimeUtc(folder, dt);
+                Directory.SetLastWriteTimeUtc(folder, dt);
+
+                // Finally, delete the folder
+                Directory.Delete(folder, true);
+
+                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} cleared traces successfully");
+            }
+            catch(Exception e)
+            {
+                prog?.Message(Message.LEVEL.ERROR, $"Error wiping folder ({Path.GetFileName(folder)})" + e.Message);
+            }
+        }
+        
+        #endregion
     }
 }

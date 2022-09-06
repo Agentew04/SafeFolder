@@ -12,11 +12,17 @@ jobs:
           - os: windows-latest
             target: win-x86
           - os: windows-latest
+            target: win-x64
+          - os: windows-latest
             target: win-arm
+          - os: windows-latest
+            target: win-arm64
           - os: ubuntu-latest
             target: linux-x64
           - os: ubuntu-latest
             target: linux-arm
+          - os: ubuntu-latest
+            target: linux-arm64
           - os: macos-latest
             target: osx-x64
           - os: macos-latest
@@ -27,8 +33,6 @@ jobs:
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: 6.0.x
-    - name: Restore dependencies
-      run: dotnet restore
     - name: Build
       run: dotnet publish -p:PublishSingleFile=true -r ${{ matrix.target }} -c Release --self-contained true -p:PublishTrimmed=true -p:EnableCompressionInSingleFile=true
     - name: Test
