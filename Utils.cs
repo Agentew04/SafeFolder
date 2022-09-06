@@ -32,13 +32,22 @@ namespace SafeFolder
         {
             Console.WriteLine(@"
 Encrypt/Decrypt files in memory: Fast, but demands more ram.
-Clear traces: Very Slow, but more secure.
 
 Encrypt/Decrypt files in memory:
-    - Encrypt/Decrypt the folder in memory for more speed.
-
+    - Uses the RAM memory to convert your files faster. Not recommended for big files as it might crash!
 Clear traces:
-    - Clears the traces of the files for impossible to recover the files.
+    - Clear all traces of the files in the hard drive, making it impossible to recover them.
+
+Safe folder now has full CLI support! Flags are now available to use in the command line:
+    -n  --nogui               => Disable the GUI and use the command line interface. Must be included to use the CLI flags.
+    -h  --help                => Show this help screen.
+    -v  --version             => Display the current version of the program.
+    -m  --inmemory            => Encrypt/Decrypt files in memory.
+    -c  --cleartraces         => Clear traces of the files in the hard drive.
+    -e  --encrypt             => Encrypt the files.
+    -d  --decrypt             => Decrypt the files.
+    -p  --password <password> => Set the password to use.
+    -V  --verbosity <0|1>     => Sets the verbosity level of the program.
 ");
         }
 
@@ -123,11 +132,11 @@ Clear traces:
         /// <param name="input">The main input</param>
         /// <param name="salt">The salt used. If <see langword="null"/>, the salt will be a empty array</param>
         /// <returns>The Key derived</returns>
-        public static byte[] DeriveKeyFromString(string input, string salt = null)
+        public static byte[] DeriveKeyFromString(string input, string? salt = null)
         {
             //get input bytes
-            var inputBytes = Encoding.UTF8.GetBytes(input);
-            var saltBytes = salt != null ? Encoding.UTF8.GetBytes(salt) : new byte[16];
+            byte[] inputBytes = Encoding.UTF8.GetBytes(input);
+            byte[] saltBytes = salt != null ? Encoding.UTF8.GetBytes(salt) : new byte[16];
             // Generate the hash
             Rfc2898DeriveBytes pbkdf2 = new(inputBytes, saltBytes, iterations: 5000, HashAlgorithmName.SHA512);
             return pbkdf2.GetBytes(32); //32 bytes length is 256 bits
@@ -155,8 +164,8 @@ Clear traces:
         /// random garbage data n times.
         /// </summary>
         /// <param name="filename">Full path of the file to be deleted</param>
-        public static void WipeFile(string filename, Progress prog)
-        {
+        public static void WipeFile(string filename, Progress? prog) {
+            bool verbose = prog is not null;
             try
             {
                 if (!File.Exists(filename)) return;
@@ -196,36 +205,39 @@ Clear traces:
                 // Finally, delete the file
                 File.Delete(filename);
 
-                prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(filename)} cleared traces successfully");
+                if(verbose) prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(filename)} cleared traces successfully");
             }
             catch(Exception e)
             {
-                prog.Message(Message.LEVEL.ERROR, $"Error wiping file ({Path.GetFileName(filename)})" + e.Message);
+                if(verbose) prog.Message(Message.LEVEL.ERROR, $"Error wiping file ({Path.GetFileName(filename)})" + e.Message);
+                else
+                    Utils.WriteLine("Error wiping file (" + Path.GetFileName(filename) + "): " + e.Message, ConsoleColor.Red);
             }
         }
 
-        public static void WipeFolder(string folder, Progress prog)
+        public static void WipeFolder(string folder, Progress? prog)
         {
             try
             {
-                if (!Directory.Exists(folder)) return;
+                if (!Directory.Exists(folder)) 
+                    return;
 
-                var dir = new DirectoryInfo(folder);
-                var files = dir.GetFiles();
-                var dirs = dir.GetDirectories();
+                DirectoryInfo dir = new(folder);
+                FileInfo[] files = dir.GetFiles();
+                DirectoryInfo[] dirs = dir.GetDirectories();
 
-                foreach (var file in files)
+                foreach (FileInfo file in files)
                 {
                     WipeFile(file.FullName, prog);
                 }
 
-                foreach (var subdir in dirs)
+                foreach (DirectoryInfo subDir in dirs)
                 {
-                    WipeFolder(subdir.FullName, prog);
+                    WipeFolder(subDir.FullName, prog);
                 }
 
                 // wipe dates
-                var dt = new DateTime(2037, 1, 1, 0, 0, 0);
+                DateTime dt = new DateTime(2037, 1, 1, 0, 0, 0);
                 Directory.SetCreationTime(folder, dt);
                 Directory.SetLastAccessTime(folder, dt);
                 Directory.SetLastWriteTime(folder, dt);
@@ -237,11 +249,11 @@ Clear traces:
                 // Finally, delete the folder
                 Directory.Delete(folder, true);
 
-                prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} cleared traces successfully");
+                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} cleared traces successfully");
             }
             catch(Exception e)
             {
-                prog.Message(Message.LEVEL.ERROR, $"Error wiping folder ({Path.GetFileName(folder)})" + e.Message);
+                prog?.Message(Message.LEVEL.ERROR, $"Error wiping folder ({Path.GetFileName(folder)})" + e.Message);
             }
         }
         
