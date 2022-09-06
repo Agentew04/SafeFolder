@@ -159,10 +159,12 @@ Safe folder now has full CLI support! Flags are now available to use in the comm
             return BCrypt.Net.BCrypt.Verify(password, hash);
         }
 
+        
         /// <summary>
         /// Deletes a file in a secure way by overwriting it with
         /// random garbage data n times.
         /// </summary>
+        /// <param name="prog">The progessbar object, null if it's on a cli run</param>
         /// <param name="filename">Full path of the file to be deleted</param>
         public static void WipeFile(string filename, Progress? prog) {
             bool verbose = prog is not null;
@@ -205,13 +207,13 @@ Safe folder now has full CLI support! Flags are now available to use in the comm
                 // Finally, delete the file
                 File.Delete(filename);
 
-                if(verbose) prog.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(filename)} cleared traces successfully");
+                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(filename)} cleared traces successfully");
             }
-            catch(Exception e)
-            {
-                if(verbose) prog.Message(Message.LEVEL.ERROR, $"Error wiping file ({Path.GetFileName(filename)})" + e.Message);
+            catch(Exception e) {
+                if (verbose)
+                    prog?.Message(Message.LEVEL.ERROR, $"Error wiping file ({Path.GetFileName(filename)})" + e.Message);
                 else
-                    Utils.WriteLine("Error wiping file (" + Path.GetFileName(filename) + "): " + e.Message, ConsoleColor.Red);
+                    WriteLine($"Error wiping file ({Path.GetFileName(filename)}): {e.Message}", ConsoleColor.Red);
             }
         }
 
