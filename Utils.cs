@@ -10,16 +10,23 @@ namespace SafeFolder
 
         #region IO
 
+        public static string GetVersion()
+        {
+            //get version from assembly
+            string version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            return version;
+        }
+
         /// <summary>
         /// Shows the splash screen.
         /// </summary>
         public static void ShowSplashScreen()
         {
-            Console.WriteLine(@"
+            Console.WriteLine(@$"
 =============================================
 
             Welcome to SafeFolder
-                   v0.1.0
+                  v{GetVersion()}
 
 =============================================
 ");
