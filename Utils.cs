@@ -38,6 +38,7 @@ Encrypt/Decrypt files in memory:
 Clear traces:
     - Clear all traces of the files in the hard drive, making it impossible to recover them.
 
+
 Safe folder now has full CLI support! Flags are now available to use in the command line:
     -n  --nogui               => Disable the GUI and use the command line interface. Must be included to use the CLI flags.
     -h  --help                => Show this help screen.
@@ -48,6 +49,9 @@ Safe folder now has full CLI support! Flags are now available to use in the comm
     -d  --decrypt             => Decrypt the files.
     -p  --password <password> => Set the password to use.
     -V  --verbosity <0|1>     => Sets the verbosity level of the program.
+
+Also, include the path of the folder that will be encrypted anywhere on the arguments (except after a flag that accepts
+a value) and it will recognize it! Defaults to current directory.
 ");
         }
 

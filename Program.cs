@@ -1,6 +1,9 @@
 ﻿using PerrysNetConsole;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Prompt = Sharprompt.Prompt;
@@ -9,8 +12,8 @@ namespace SafeFolder;
 
 public static class Program
 {
-    public struct ProgramOptions {
-        public bool IsNoGui { get; init; }
+    private struct ProgramOptions {
+        public string FolderPath { get; init; }
         public bool HelpRequested { get; init; }
         public bool VersionRequested { get; init; }
         public bool InMemory { get; init; }
@@ -20,31 +23,52 @@ public static class Program
         public string? Password { get; init; }
         public int Verbosity { get; init; }
     }
-    private static async Task Main(string[] args) {
-        bool isNoGui = CliUtils.hasFlag(args, new Flag("nogui", "n"));
-        bool helpRequested = CliUtils.hasFlag(args, new Flag("help", "h"));
-        bool versionRequested = CliUtils.hasFlag(args, new Flag("version", "v"));
-        bool inMemory = CliUtils.hasFlag(args, new Flag("inmemory", "m"));
-        bool clearTraces = CliUtils.hasFlag(args, new Flag("cleartraces", "c"));
-        bool encrypt = CliUtils.hasFlag(args, new Flag("encrypt", "e"));
-        bool decrypt = CliUtils.hasFlag(args, new Flag("decrypt", "d"));
-        string? password = CliUtils.getFlagValue(args, new Flag("password", "p"));
-        string? verbosity = CliUtils.getFlagValue(args, new Flag("verbosity", "V"));
 
+    private static Dictionary<string, Flag> flags = new() {
+        { "nogui", new Flag("nogui", "n") },
+        { "help", new Flag("help", "h") },
+        { "version", new Flag("version", "v") },
+        { "memory", new Flag("inmemory", "m") },
+        { "clear", new Flag("cleartraces", "c") },
+        { "encrypt", new Flag("encrypt", "e") },
+        { "decrypt", new Flag("decrypt", "d") },
+        { "password", new Flag("password", "p", true) },
+        { "verbosity", new Flag("verbosity", "V", true) }
+    };
+    
+    private static async Task Main(string[] args) {
+        bool isNoGui = Flag.HasFlag(args, flags["nogui"]);
+        bool helpRequested = Flag.HasFlag(args, flags["help"]);
+        bool versionRequested = Flag.HasFlag(args, flags["version"]);
+        bool inMemory = Flag.HasFlag(args, flags["memory"]);
+        bool clearTraces = Flag.HasFlag(args, flags["clear"]);
+        bool encrypt = Flag.HasFlag(args, flags["encrypt"]);
+        bool decrypt = Flag.HasFlag(args, flags["decrypt"]);
+
+        bool pwdIncluded = Flag.TryGetFlagValue(args, flags["password"], out string password);
+        bool verbIncluded = Flag.TryGetFlagValue(args, flags["verbosity"], out string verbosity);
+
+        var strays = Flag.GetStrayArgs(args, flags.Values);
+        string folderPath = strays.Count > 0 ? 
+            strays.ElementAt(0) : 
+            Directory.GetCurrentDirectory(); 
+        
+
+        // pack flags information on one struct
         ProgramOptions opt = new() {
-            IsNoGui = isNoGui,
+            FolderPath = folderPath,
             HelpRequested = helpRequested,
             VersionRequested = versionRequested,
             InMemory = inMemory,
             ClearTraces = clearTraces,
             Encrypt = encrypt,
             Decrypt = decrypt,
-            Password = password,
-            Verbosity = verbosity == null ? 0 : int.Parse(verbosity)
+            Password = pwdIncluded ? password : null,
+            Verbosity = !verbIncluded ? 0 : int.Parse(verbosity)
         };
         
 
-        if (isNoGui)
+        if (isNoGui || helpRequested || versionRequested)
             await StartCli(opt);
         else
             await StartInteractive();
@@ -121,33 +145,41 @@ public static class Program
             Utils.ShowInfoScreen();
             return true;
         }
+        
         if (opt.VersionRequested) {
             string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown";
             Utils.WriteLine($"Current SafeFolder version: {version}", version == "Unknown" ? ConsoleColor.Red : ConsoleColor.Green);
             return true;
         }
-        if(!opt.Decrypt && !opt.Encrypt) {
-            Utils.WriteLine("You must specify either --encrypt(-e) or --decrypt(-d)", ConsoleColor.Red);
-            return false;
+        
+        switch (opt) {
+            case { Decrypt: false, Encrypt: false }:
+                Utils.WriteLine("You must specify either --encrypt(-e) or --decrypt(-d)", ConsoleColor.Red);
+                return false;
+            case { Decrypt: true, Encrypt: true }:
+                Utils.WriteLine("You can't specify both --encrypt(-e) and --decrypt(-d)", ConsoleColor.Red);
+                return false;
         }
-        if(opt.Decrypt && opt.Encrypt) {
-            Utils.WriteLine("You can't specify both --encrypt(-e) and --decrypt(-d)", ConsoleColor.Red);
-            return false;
-        }
+
         if(opt.Password == null) {
             Utils.WriteLine("You must specify a password using '--password <PASSWORD>' or '-p <PASSWORD>'", ConsoleColor.Red);
             return false;
         }
+        
         if(opt.Password.Length < 4) {
             Utils.WriteLine("Password must be at least 4 characters long", ConsoleColor.Red);
             return false;
         }
+        
         bool verbose = opt.Verbosity > 0;
         Stopwatch stopWatch = new();
         stopWatch.Start();
         
         byte[] key = Utils.DeriveKeyFromString(opt.Password);
         string pwdHash = Utils.GetHash(Utils.HashBytes(key));
+        
+        Directory.SetCurrentDirectory(opt.FolderPath);
+        
         if(verbose)
             Utils.WriteLine($"{(opt.Encrypt ? "Encrypting" : "Decrypting")} files now");
         if (opt.Encrypt) {
