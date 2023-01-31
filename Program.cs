@@ -14,7 +14,7 @@ public static class Program
 {
     private struct ProgramOptions {
         public string FolderPath { get; init; }
-        //public string? BlacklistFiles { get; init; }
+        public string? BlacklistFiles { get; init; }
         public bool HelpRequested { get; init; }
         public bool VersionRequested { get; init; }
         public bool InMemory { get; init; }
@@ -27,7 +27,7 @@ public static class Program
 
     private static readonly Dictionary<string, Flag> _flags = new() {
         { "nogui", new Flag("nogui", "n") },
-        //{ "blacklist", new Flag("blacklist", "b", true) },
+        { "blacklist", new Flag("blacklist", "b", true) },
         { "help", new Flag("help", "h") },
         { "version", new Flag("version", "v") },
         { "memory", new Flag("inmemory", "m") },
@@ -49,16 +49,17 @@ public static class Program
         bool verbose = Flag.HasFlag(args, _flags["verbosity"]);
 
         bool pwdIncluded = Flag.TryGetFlagValue(args, _flags["password"], out string password);
-        //bool blacklistIncluded = Flag.TryGetFlagValue(args, _flags["blacklist"], out string blacklist);
+        bool blacklistIncluded = Flag.TryGetFlagValue(args, _flags["blacklist"], out string blacklist);
 
-        List<string> folderPaths = Flag.GetStrayArgs(args, _flags.Values); //.FirstOrDefault() ?? Directory.GetCurrentDirectory();
-
-
+        List<string> folderPaths = Flag.GetStrayArgs(args, _flags.Values); 
+        if(folderPaths.Count == 0)
+            folderPaths.Add(Directory.GetCurrentDirectory());
+        
         foreach (string folderPath in folderPaths) {
             // pack flags information on one struct
             ProgramOptions opt = new() {
                 FolderPath = folderPath,
-                //BlacklistFiles = blacklistIncluded ? blacklist : null,
+                BlacklistFiles = blacklistIncluded ? blacklist : null,
                 HelpRequested = helpRequested,
                 VersionRequested = versionRequested,
                 InMemory = inMemory,
@@ -83,7 +84,11 @@ public static class Program
         
         Utils.ShowSplashScreen();
 
-        string? state = Prompt.Select("What do you want", new[] { "Encrypt Files", "Decrypt Files", "Info about program" });
+        string? state = Prompt.Select("What do you want", new[] { "Encrypt Files", 
+            "Decrypt Files", 
+            "Info about program",
+            "Exit"
+        });
         switch (state)
         {
             case "Info about program":
@@ -91,6 +96,8 @@ public static class Program
                 Utils.ShowInfoScreen();
                 Console.WriteLine("Press any key to close the program.");
                 Console.ReadKey();
+                return;
+            case "Exit":
                 return;
             case "Encrypt Files":
                 method = Prompt.Confirm("Encrypt files in memory? (Fast, but demands more ram)");
@@ -183,7 +190,8 @@ public static class Program
 
         Engine engine = new(new EngineConfiguration {
             ProgressBar = null,
-            FolderPath = opt.FolderPath
+            FolderPath = opt.FolderPath,
+            Blacklist = opt.BlacklistFiles ?? ""
         });
         
         if(opt.Verbose)

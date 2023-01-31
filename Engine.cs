@@ -7,6 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.IO.Compression;
+using System.Text.RegularExpressions;
 
 namespace SafeFolder;
 
@@ -21,6 +22,7 @@ public class Engine {
     private string _folderPath;
     private Progress? _progress;
     private Stopwatch _clock;
+    private readonly List<Regex> _blacklist; 
 
     public TimeSpan Elapsed => _clock.Elapsed; 
     
@@ -30,6 +32,14 @@ public class Engine {
         _folderPath = configuration.FolderPath;
         _progress = configuration.ProgressBar;
         _clock = new Stopwatch();
+        _blacklist = new List<Regex>();
+        
+        if (!string.IsNullOrWhiteSpace(configuration.Blacklist)) {
+            string[] regexes = configuration.Blacklist.Split(';');
+            foreach(string regex in regexes) {
+                _blacklist.Add(new Regex(regex + "$"));
+            }
+        }
     }
     
     #endregion
@@ -171,13 +181,13 @@ public class Engine {
         _clock.Restart();
         bool verbose = _progress is not null;
         List<string> files = Directory.EnumerateFiles(_folderPath)
-            .Where(f => 
-                !Path.GetFileName(f).Contains(_safeFolderName) && 
-                !f.EndsWith(".pdb") && 
-                !f.EndsWith(".enc"))
+            .Where(f => !Path.GetFileName(f).Contains(_safeFolderName) && !f.EndsWith(".pdb") && !f.EndsWith(".enc"))
+            .Where(file => !_blacklist.Any(regex => regex.Match(file).Success))
             .ToList();
-
-        List<string> folders = Directory.GetDirectories(_folderPath).ToList();
+        
+        List<string> folders = Directory.GetDirectories(_folderPath)
+            .Where(folder => !_blacklist.Any(regex => regex.Match(folder).Success))
+            .ToList();
 
         double progress = 100.0 / (files.Count + folders.Count == 0 ? 100 : files.Count + folders.Count);
 
@@ -193,7 +203,7 @@ public class Engine {
                     File.Delete(file);
                 }
                 if(verbose) _progress.Percentage += progress;
-            }catch (Exception e){
+            }catch (Exception e) {
                 _progress?.Message(Message.LEVEL.ERROR, $"{e.Message}");
                 _progress?.Stop();
                 Console.WriteLine(e);
