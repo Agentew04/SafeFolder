@@ -22,7 +22,7 @@ public static class Program
         public bool Encrypt { get; init; }
         public bool Decrypt { get; init; }
         public string? Password { get; init; }
-        public int Verbosity { get; init; }
+        public bool Verbose { get; init; }
     }
 
     private static readonly Dictionary<string, Flag> _flags = new() {
@@ -35,7 +35,7 @@ public static class Program
         { "encrypt", new Flag("encrypt", "e") },
         { "decrypt", new Flag("decrypt", "d") },
         { "password", new Flag("password", "p", true) },
-        { "verbosity", new Flag("verbosity", "V", true) }
+        { "verbosity", new Flag("verbosity", "V") }
     };
     
     private static async Task Main(string[] args) {
@@ -46,33 +46,35 @@ public static class Program
         bool clearTraces = Flag.HasFlag(args, _flags["clear"]);
         bool encrypt = Flag.HasFlag(args, _flags["encrypt"]);
         bool decrypt = Flag.HasFlag(args, _flags["decrypt"]);
+        bool verbose = Flag.HasFlag(args, _flags["verbosity"]);
 
         bool pwdIncluded = Flag.TryGetFlagValue(args, _flags["password"], out string password);
-        bool verbIncluded = Flag.TryGetFlagValue(args, _flags["verbosity"], out string verbosity);
         //bool blacklistIncluded = Flag.TryGetFlagValue(args, _flags["blacklist"], out string blacklist);
 
-        string folderPath = Flag.GetStrayArgs(args, _flags.Values).FirstOrDefault() ?? Directory.GetCurrentDirectory();
-         
+        List<string> folderPaths = Flag.GetStrayArgs(args, _flags.Values); //.FirstOrDefault() ?? Directory.GetCurrentDirectory();
 
-        // pack flags information on one struct
-        ProgramOptions opt = new() {
-            FolderPath = folderPath,
-            //BlacklistFiles = blacklistIncluded ? blacklist : null,
-            HelpRequested = helpRequested,
-            VersionRequested = versionRequested,
-            InMemory = inMemory,
-            ClearTraces = clearTraces,
-            Encrypt = encrypt,
-            Decrypt = decrypt,
-            Password = pwdIncluded ? password : null,
-            Verbosity = !verbIncluded ? 0 : int.Parse(verbosity)
-        };
-        
 
-        if (isNoGui || helpRequested || versionRequested)
-            await StartCli(opt);
-        else
-            await StartInteractive();
+        foreach (string folderPath in folderPaths) {
+            // pack flags information on one struct
+            ProgramOptions opt = new() {
+                FolderPath = folderPath,
+                //BlacklistFiles = blacklistIncluded ? blacklist : null,
+                HelpRequested = helpRequested,
+                VersionRequested = versionRequested,
+                InMemory = inMemory,
+                ClearTraces = clearTraces,
+                Encrypt = encrypt,
+                Decrypt = decrypt,
+                Password = pwdIncluded ? password : null,
+                Verbose = verbose
+            };
+
+
+            if (isNoGui || helpRequested || versionRequested)
+                await StartCli(opt);
+            else
+                await StartInteractive();
+        }
     }
 
     private static async Task StartInteractive() {
@@ -100,44 +102,38 @@ public static class Program
                 break;
         }
 
-        var stopWatch = new Stopwatch();
-        var prog = new Progress();
+        Progress progressBar = new();
 
-        var pwd = Prompt.Password("Enter password", placeholder: "Take Care With CAPS-LOCK", validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
-        var pwd2 = Prompt.Password("Re-Enter password", placeholder: "Take Care With CAPS-LOCK", validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
+        string? pwd = Prompt.Password("Enter password", placeholder: "Take Care With CAPS-LOCK", validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
+        string? pwd2 = Prompt.Password("Re-Enter password", placeholder: "Take Care With CAPS-LOCK", validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
         if (pwd != pwd2) 
             throw new Exception("Passwords do not match");
 
         var key = Utils.DeriveKeyFromString(pwd);
         var pwdHash = Utils.GetHash(Utils.HashBytes(key));
-        Engine engine = new(new EngineConfiguration() {
-            ProgressBar = prog
+        
+        Engine engine = new(new EngineConfiguration {
+            ProgressBar = progressBar
         });
+        
         switch (state) {
             case "Encrypt Files":
                 // have to encrypt
-                prog.Start();
-                prog.Message(Message.LEVEL.INFO, "Encrypting files...");
-                stopWatch.Start();
+                progressBar.Start();
+                progressBar.Message(Message.LEVEL.INFO, "Encrypting files...");
                 await engine.PackFiles(key, pwdHash, method, traces);
                 break;
             case "Decrypt Files":
                 // have to decrypt
-                prog.Start();
-                prog.Message(Message.LEVEL.INFO, "Decrypting files...");
-                stopWatch.Start();
+                progressBar.Start();
+                progressBar.Message(Message.LEVEL.INFO, "Decrypting files...");
                 await engine.UnpackFiles(key, pwdHash, method, traces);
                 break;
         }
-
-        stopWatch.Stop();
-        var ms = stopWatch.Elapsed.Milliseconds.ToString("D3");
-        var s = stopWatch.Elapsed.Seconds.ToString("D2");
-        var m = stopWatch.Elapsed.Minutes.ToString("D2");
-
-        prog.Message(Message.LEVEL.SUCCESS, $"Done in {m}:{s}:{ms}!");
-        prog.Update(100);
-        prog.Stop();
+        
+        progressBar.Message(Message.LEVEL.SUCCESS, $"Done in {engine.Elapsed:mm\\:ss\\:fff}!");
+        progressBar.Update(100);
+        progressBar.Stop();
         CoEx.WriteLine();
         Console.WriteLine("Press any key to close the program.");
         Console.ReadKey();
@@ -179,20 +175,20 @@ public static class Program
         bool error = CheckForInputError(opt); // returns true on error, false on success
         if (error) 
             return false;
-        
-        bool verbose = opt.Verbosity > 0;
-        
+
         byte[] key = Utils.DeriveKeyFromString(opt.Password!);
         string pwdHash = Utils.GetHash(Utils.HashBytes(key));
         
         Directory.SetCurrentDirectory(opt.FolderPath);
 
-        Engine engine = new(new EngineConfiguration() {
-            ProgressBar = null
+        Engine engine = new(new EngineConfiguration {
+            ProgressBar = null,
+            FolderPath = opt.FolderPath
         });
         
-        if(verbose)
+        if(opt.Verbose)
             Utils.WriteLine($"{(opt.Encrypt ? "Encrypting" : "Decrypting")} files now");
+        
         if (opt.Encrypt) {
             await engine.PackFiles(key, pwdHash, opt.InMemory, opt.ClearTraces);
         }else {
@@ -200,8 +196,10 @@ public static class Program
         }
 
         
-        if (verbose) 
+        if (opt.Verbose) 
             Utils.WriteLine($"Done in {engine.Elapsed:mm\\:ss\\:fff}!");
         return true;
     }
+    
+    
 }

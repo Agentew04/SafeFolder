@@ -52,7 +52,7 @@ Safe folder now has full CLI support! Flags are now available to use in the comm
     -e  --encrypt             => Encrypt the files.
     -d  --decrypt             => Decrypt the files.
     -p  --password <password> => Set the password to use.
-    -V  --verbosity <0|1>     => Sets the verbosity level of the program.
+    -V  --verbosity           => If enabled, an output will be shown.
     -b  --blacklist <regex>   => Multiple regexes separated by semicolon. Files that match these are ignored.
 
 Also, include the path of the folder that will be encrypted anywhere on the arguments (except after a flag that accepts

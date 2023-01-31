@@ -33,11 +33,10 @@ public class Engine {
     }
     
     #endregion
-    
+
     #region Files
 
-    private static void PackSingleFile(byte[] key, string pwdHash, string file)
-    {
+    private static void PackSingleFile(byte[] key, string pwdHash, string file) {
         #region header
         var iv = Utils.GenerateIv();
         var guid = Guid.NewGuid();
@@ -76,8 +75,7 @@ public class Engine {
 
         #endregion
     }
-    private static void PackSingleFolder(byte[] key, string pwdHash, string folder, bool method)
-    {
+    private static void PackSingleFolder(byte[] key, string pwdHash, string folder, bool method) {
         if (method){
             var dirInfo = new DirectoryInfo(folder);
             using var ms = new MemoryStream();
@@ -172,11 +170,14 @@ public class Engine {
     public async Task PackFiles(byte[] key, string pwdHash, bool method, bool traces) {
         _clock.Restart();
         bool verbose = _progress is not null;
-        List<string> files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
-            .Where(f => !Path.GetFileName(f).Contains(_safeFolderName) && !f.EndsWith(".pdb") && !f.EndsWith(".enc"))
+        List<string> files = Directory.EnumerateFiles(_folderPath)
+            .Where(f => 
+                !Path.GetFileName(f).Contains(_safeFolderName) && 
+                !f.EndsWith(".pdb") && 
+                !f.EndsWith(".enc"))
             .ToList();
 
-        List<string> folders = Directory.GetDirectories(Directory.GetCurrentDirectory()).ToList();
+        List<string> folders = Directory.GetDirectories(_folderPath).ToList();
 
         double progress = 100.0 / (files.Count + folders.Count == 0 ? 100 : files.Count + folders.Count);
 
@@ -296,7 +297,7 @@ public class Engine {
                 using var zip = Ionic.Zip.ZipFile.Read(ms);
                 
                 
-                zip.ExtractAll(Directory.GetCurrentDirectory() , Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
+                zip.ExtractAll(_folderPath , Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
             }else{
                 using var outStream = File.Create($"{header.Name}.zip");
                 using var aes = Aes.Create();
@@ -333,14 +334,10 @@ public class Engine {
 
     public async Task UnpackFiles(byte[] key, string pwdHash, bool method, bool traces) {
         _clock.Restart();
-        List<string> files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
+        List<string> files = Directory.EnumerateFiles(_folderPath)
             .Where(f => f.EndsWith(".enc")).ToList();
 
-        List<string> zips = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
-            .Where(f => f.EndsWith(".zip")).ToList();
-
-        double progress = 100.0 / (!files.Any() ? 100 : files.Count + zips.Count);
-        
+        double progress = 100.0 / (!files.Any() ? 100 : files.Count );
 
         // decrypt files and folders
         await Parallel.ForEachAsync(files, (file, _) =>
@@ -362,5 +359,6 @@ public class Engine {
     }
     
     #endregion
+
 }
 #pragma warning restore CS8602
