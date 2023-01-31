@@ -14,6 +14,7 @@ public static class Program
 {
     private struct ProgramOptions {
         public string FolderPath { get; init; }
+        //public string? BlacklistFiles { get; init; }
         public bool HelpRequested { get; init; }
         public bool VersionRequested { get; init; }
         public bool InMemory { get; init; }
@@ -24,8 +25,9 @@ public static class Program
         public int Verbosity { get; init; }
     }
 
-    private static Dictionary<string, Flag> flags = new() {
+    private static readonly Dictionary<string, Flag> _flags = new() {
         { "nogui", new Flag("nogui", "n") },
+        //{ "blacklist", new Flag("blacklist", "b", true) },
         { "help", new Flag("help", "h") },
         { "version", new Flag("version", "v") },
         { "memory", new Flag("inmemory", "m") },
@@ -37,26 +39,25 @@ public static class Program
     };
     
     private static async Task Main(string[] args) {
-        bool isNoGui = Flag.HasFlag(args, flags["nogui"]);
-        bool helpRequested = Flag.HasFlag(args, flags["help"]);
-        bool versionRequested = Flag.HasFlag(args, flags["version"]);
-        bool inMemory = Flag.HasFlag(args, flags["memory"]);
-        bool clearTraces = Flag.HasFlag(args, flags["clear"]);
-        bool encrypt = Flag.HasFlag(args, flags["encrypt"]);
-        bool decrypt = Flag.HasFlag(args, flags["decrypt"]);
+        bool isNoGui = Flag.HasFlag(args, _flags["nogui"]);
+        bool helpRequested = Flag.HasFlag(args, _flags["help"]);
+        bool versionRequested = Flag.HasFlag(args, _flags["version"]);
+        bool inMemory = Flag.HasFlag(args, _flags["memory"]);
+        bool clearTraces = Flag.HasFlag(args, _flags["clear"]);
+        bool encrypt = Flag.HasFlag(args, _flags["encrypt"]);
+        bool decrypt = Flag.HasFlag(args, _flags["decrypt"]);
 
-        bool pwdIncluded = Flag.TryGetFlagValue(args, flags["password"], out string password);
-        bool verbIncluded = Flag.TryGetFlagValue(args, flags["verbosity"], out string verbosity);
+        bool pwdIncluded = Flag.TryGetFlagValue(args, _flags["password"], out string password);
+        bool verbIncluded = Flag.TryGetFlagValue(args, _flags["verbosity"], out string verbosity);
+        //bool blacklistIncluded = Flag.TryGetFlagValue(args, _flags["blacklist"], out string blacklist);
 
-        var strays = Flag.GetStrayArgs(args, flags.Values);
-        string folderPath = strays.Count > 0 ? 
-            strays.ElementAt(0) : 
-            Directory.GetCurrentDirectory(); 
-        
+        string folderPath = Flag.GetStrayArgs(args, _flags.Values).FirstOrDefault() ?? Directory.GetCurrentDirectory();
+         
 
         // pack flags information on one struct
         ProgramOptions opt = new() {
             FolderPath = folderPath,
+            //BlacklistFiles = blacklistIncluded ? blacklist : null,
             HelpRequested = helpRequested,
             VersionRequested = versionRequested,
             InMemory = inMemory,
@@ -109,21 +110,23 @@ public static class Program
 
         var key = Utils.DeriveKeyFromString(pwd);
         var pwdHash = Utils.GetHash(Utils.HashBytes(key));
-        switch (state)
-        {
+        Engine engine = new(new EngineConfiguration() {
+            ProgressBar = prog
+        });
+        switch (state) {
             case "Encrypt Files":
                 // have to encrypt
                 prog.Start();
                 prog.Message(Message.LEVEL.INFO, "Encrypting files...");
                 stopWatch.Start();
-                await Engine.PackFiles(key, pwdHash, prog, method, traces);
+                await engine.PackFiles(key, pwdHash, method, traces);
                 break;
             case "Decrypt Files":
                 // have to decrypt
                 prog.Start();
                 prog.Message(Message.LEVEL.INFO, "Decrypting files...");
                 stopWatch.Start();
-                await Engine.UnpackFiles(key, pwdHash, prog, method, traces);
+                await engine.UnpackFiles(key, pwdHash, method, traces);
                 break;
         }
 
@@ -139,6 +142,27 @@ public static class Program
         Console.WriteLine("Press any key to close the program.");
         Console.ReadKey();
     }
+
+    private static bool CheckForInputError(ProgramOptions opt) {
+        switch (opt) {
+            case { Decrypt: false, Encrypt: false }:
+                Utils.WriteLine("You must specify either --encrypt(-e) or --decrypt(-d)", ConsoleColor.Red);
+                return true;
+            case { Decrypt: true, Encrypt: true }:
+                Utils.WriteLine("You can't specify both --encrypt(-e) and --decrypt(-d)", ConsoleColor.Red);
+                return true;
+        }
+        
+        if(opt.Password == null) {
+            Utils.WriteLine("You must specify a password using '--password <PASSWORD>' or '-p <PASSWORD>'", ConsoleColor.Red);
+            return true;
+        }
+
+        if (opt.Password.Length >= 4) return false;
+        Utils.WriteLine("Password must be at least 4 characters long", ConsoleColor.Red);
+        return true;
+
+    } 
     
     private static async Task<bool> StartCli(ProgramOptions opt) {
         if (opt.HelpRequested) {
@@ -151,49 +175,33 @@ public static class Program
             Utils.WriteLine($"Current SafeFolder version: {version}", version == "Unknown" ? ConsoleColor.Red : ConsoleColor.Green);
             return true;
         }
-        
-        switch (opt) {
-            case { Decrypt: false, Encrypt: false }:
-                Utils.WriteLine("You must specify either --encrypt(-e) or --decrypt(-d)", ConsoleColor.Red);
-                return false;
-            case { Decrypt: true, Encrypt: true }:
-                Utils.WriteLine("You can't specify both --encrypt(-e) and --decrypt(-d)", ConsoleColor.Red);
-                return false;
-        }
 
-        if(opt.Password == null) {
-            Utils.WriteLine("You must specify a password using '--password <PASSWORD>' or '-p <PASSWORD>'", ConsoleColor.Red);
+        bool error = CheckForInputError(opt); // returns true on error, false on success
+        if (error) 
             return false;
-        }
-        
-        if(opt.Password.Length < 4) {
-            Utils.WriteLine("Password must be at least 4 characters long", ConsoleColor.Red);
-            return false;
-        }
         
         bool verbose = opt.Verbosity > 0;
-        Stopwatch stopWatch = new();
-        stopWatch.Start();
         
-        byte[] key = Utils.DeriveKeyFromString(opt.Password);
+        byte[] key = Utils.DeriveKeyFromString(opt.Password!);
         string pwdHash = Utils.GetHash(Utils.HashBytes(key));
         
         Directory.SetCurrentDirectory(opt.FolderPath);
+
+        Engine engine = new(new EngineConfiguration() {
+            ProgressBar = null
+        });
         
         if(verbose)
             Utils.WriteLine($"{(opt.Encrypt ? "Encrypting" : "Decrypting")} files now");
         if (opt.Encrypt) {
-            await Engine.PackFiles(key, pwdHash, null, opt.InMemory, opt.ClearTraces);
+            await engine.PackFiles(key, pwdHash, opt.InMemory, opt.ClearTraces);
         }else {
-            await Engine.UnpackFiles(key, pwdHash, null, opt.InMemory, opt.ClearTraces);
+            await engine.UnpackFiles(key, pwdHash, opt.InMemory, opt.ClearTraces);
         }
 
-        stopWatch.Stop();
-        var ms = stopWatch.Elapsed.Milliseconds.ToString("D3");
-        var s = stopWatch.Elapsed.Seconds.ToString("D2");
-        var m = stopWatch.Elapsed.Minutes.ToString("D2");
+        
         if (verbose) 
-            Utils.WriteLine($"Done in {m}:{s}:{ms}!");
+            Utils.WriteLine($"Done in {engine.Elapsed:mm\\:ss\\:fff}!");
         return true;
     }
 }

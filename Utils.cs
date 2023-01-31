@@ -10,18 +10,16 @@ namespace SafeFolder
 
         #region IO
 
-        public static string GetVersion()
-        {
+        private static string GetVersion() {
             //get version from assembly
-            string version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-            return version;
+            string? version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString();
+            return version ?? "";
         }
 
         /// <summary>
         /// Shows the splash screen.
         /// </summary>
-        public static void ShowSplashScreen()
-        {
+        public static void ShowSplashScreen() {
             Console.WriteLine(@$"
 =============================================
 
@@ -35,8 +33,7 @@ namespace SafeFolder
         /// <summary>
         /// Shows the info screen.
         /// </summary>
-        public static void ShowInfoScreen()
-        {
+        public static void ShowInfoScreen() {
             Console.WriteLine(@"
 Encrypt/Decrypt files in memory: Fast, but demands more ram.
 
@@ -56,6 +53,7 @@ Safe folder now has full CLI support! Flags are now available to use in the comm
     -d  --decrypt             => Decrypt the files.
     -p  --password <password> => Set the password to use.
     -V  --verbosity <0|1>     => Sets the verbosity level of the program.
+    -b  --blacklist <regex>   => Multiple regexes separated by semicolon. Files that match these are ignored.
 
 Also, include the path of the folder that will be encrypted anywhere on the arguments (except after a flag that accepts
 a value) and it will recognize it! Defaults to current directory.
@@ -67,8 +65,7 @@ a value) and it will recognize it! Defaults to current directory.
         /// </summary>
         /// <param name="message">The message, if not ends with \n, \n will be appended</param>
         /// <param name="color">The color to write the message</param>
-        public static void WriteLine(string message, ConsoleColor color = ConsoleColor.White)
-        {
+        public static void WriteLine(string message, ConsoleColor color = ConsoleColor.White) {
             Console.ForegroundColor = color;
             if(!message.EndsWith("\n"))
                 message+= "\n";
@@ -170,18 +167,14 @@ a value) and it will recognize it! Defaults to current directory.
             return BCrypt.Net.BCrypt.Verify(password, hash);
         }
 
-        
         /// <summary>
-        /// Deletes a file in a secure way by overwriting it with
-        /// random garbage data n times.
+        /// Deletes a file in a secure way by overwriting it with zeros.
         /// </summary>
-        /// <param name="prog">The progessbar object, null if it's on a cli run</param>
         /// <param name="filename">Full path of the file to be deleted</param>
-        public static void WipeFile(string filename, Progress? prog) {
-            bool verbose = prog is not null;
+        public static bool WipeFile(string filename) {
             try
             {
-                if (!File.Exists(filename)) return;
+                if (!File.Exists(filename)) return true;
                 // Set the files attributes to normal in case it's read-only.
                 File.SetAttributes(filename, FileAttributes.Normal);
 
@@ -206,7 +199,7 @@ a value) and it will recognize it! Defaults to current directory.
                 inputStream.Close();
 
                 // wipe dates
-                var dt = new DateTime(2037, 1, 1, 0, 0, 0);
+                DateTime dt = new(2037, 1, 1, 0, 0, 0);
                 File.SetCreationTime(filename, dt);
                 File.SetLastAccessTime(filename, dt);
                 File.SetLastWriteTime(filename, dt);
@@ -217,40 +210,34 @@ a value) and it will recognize it! Defaults to current directory.
 
                 // Finally, delete the file
                 File.Delete(filename);
-
-                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(filename)} cleared traces successfully");
+                return true;
             }
-            catch(Exception e) {
-                if (verbose)
-                    prog?.Message(Message.LEVEL.ERROR, $"Error wiping file ({Path.GetFileName(filename)})" + e.Message);
-                else
-                    WriteLine($"Error wiping file ({Path.GetFileName(filename)}): {e.Message}", ConsoleColor.Red);
+            catch(Exception) {
+                return false;
             }
         }
 
-        public static void WipeFolder(string folder, Progress? prog)
+        /// <summary>
+        /// Recursively Wipes all files inside a folder and its subfolders.
+        /// </summary>
+        /// <param name="folder">The folder to be wiped</param>
+        /// <returns>If the operation was successful or not.</returns>
+        public static bool WipeFolder(string folder)
         {
-            try
-            {
+            try {
                 if (!Directory.Exists(folder)) 
-                    return;
+                    return true;
 
                 DirectoryInfo dir = new(folder);
-                FileInfo[] files = dir.GetFiles();
-                DirectoryInfo[] dirs = dir.GetDirectories();
+                
+                foreach (FileInfo file in dir.GetFiles())
+                    WipeFile(file.FullName);
 
-                foreach (FileInfo file in files)
-                {
-                    WipeFile(file.FullName, prog);
-                }
-
-                foreach (DirectoryInfo subDir in dirs)
-                {
-                    WipeFolder(subDir.FullName, prog);
-                }
+                foreach (DirectoryInfo subDir in dir.GetDirectories())
+                    WipeFolder(subDir.FullName);
 
                 // wipe dates
-                DateTime dt = new DateTime(2037, 1, 1, 0, 0, 0);
+                DateTime dt = new(2037, 1, 1, 0, 0, 0);
                 Directory.SetCreationTime(folder, dt);
                 Directory.SetLastAccessTime(folder, dt);
                 Directory.SetLastWriteTime(folder, dt);
@@ -261,12 +248,10 @@ a value) and it will recognize it! Defaults to current directory.
 
                 // Finally, delete the folder
                 Directory.Delete(folder, true);
-
-                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} cleared traces successfully");
+                return true;
             }
-            catch(Exception e)
-            {
-                prog?.Message(Message.LEVEL.ERROR, $"Error wiping folder ({Path.GetFileName(folder)})" + e.Message);
+            catch(Exception) {
+                return false;
             }
         }
         

@@ -10,8 +10,7 @@ using System.IO.Compression;
 
 namespace SafeFolder;
 
-public static class Engine
-{
+public class Engine {
     private const int KeySize = 256;
     private const int BlockSize = 128;
     private const PaddingMode PaddingMode = System.Security.Cryptography.PaddingMode.PKCS7;
@@ -19,6 +18,22 @@ public static class Engine
     
     private static readonly string _safeFolderName = Process.GetCurrentProcess().ProcessName;
 
+    private string _folderPath;
+    private Progress? _progress;
+    private Stopwatch _clock;
+
+    public TimeSpan Elapsed => _clock.Elapsed; 
+    
+    # region Constructor
+
+    public Engine(EngineConfiguration configuration) {
+        _folderPath = configuration.FolderPath;
+        _progress = configuration.ProgressBar;
+        _clock = new Stopwatch();
+    }
+    
+    #endregion
+    
     #region Files
 
     private static void PackSingleFile(byte[] key, string pwdHash, string file)
@@ -55,8 +70,7 @@ public static class Engine
         using var cryptoStream = new CryptoStream(outStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
         Span<byte> buffer = stackalloc byte[1024];
         int bytesRead;
-        while ( (bytesRead= inStream.Read(buffer)) > 0)
-        {
+        while ( (bytesRead= inStream.Read(buffer)) > 0) {
             cryptoStream.Write(buffer[..bytesRead]);
         }
 
@@ -155,8 +169,9 @@ public static class Engine
     }
     
     #pragma warning disable CS8602
-    public static async Task PackFiles(byte[] key, string pwdHash, Progress? prog, bool method, bool traces) {
-        bool verbose = prog is not null;
+    public async Task PackFiles(byte[] key, string pwdHash, bool method, bool traces) {
+        _clock.Restart();
+        bool verbose = _progress is not null;
         List<string> files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
             .Where(f => !Path.GetFileName(f).Contains(_safeFolderName) && !f.EndsWith(".pdb") && !f.EndsWith(".enc"))
             .ToList();
@@ -170,17 +185,16 @@ public static class Engine
         {
             try{
                 PackSingleFile(key, pwdHash, Path.GetFileName(file));
-                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} encrypted successfully");
+                _progress?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} encrypted successfully");
                 if (traces){
-                    Utils.WipeFile(file, prog);
+                    Utils.WipeFile(file);
                 }else{
                     File.Delete(file);
                 }
-                if(verbose) prog.Percentage += progress;
-            }catch (Exception e)
-            {
-                prog?.Message(Message.LEVEL.ERROR, $"{e.Message}");
-                prog?.Stop();
+                if(verbose) _progress.Percentage += progress;
+            }catch (Exception e){
+                _progress?.Message(Message.LEVEL.ERROR, $"{e.Message}");
+                _progress?.Stop();
                 Console.WriteLine(e);
             }
 
@@ -192,27 +206,34 @@ public static class Engine
         {
             try{
                 PackSingleFolder(key, pwdHash, Path.GetFileName(folder), method);
-                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} encrypted successfully");
+                _progress?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} encrypted successfully");
                 if (traces){
-                    Utils.WipeFolder(folder, prog);
-                    Utils.WipeFile($"{folder}.zip", prog);
+                    bool result = Utils.WipeFolder(folder);
+                    result = result && Utils.WipeFile($"{folder}.zip");
+                    if(result)
+                        _progress?.Message(Message.LEVEL.DEBUG, $"Wiped folder {folder}");
+                    else 
+                        _progress?.Message(Message.LEVEL.ERROR,$"Error wiping folder {folder}");
+                    
                 }else{
                     Directory.Delete(folder, true);
                     File.Delete(Path.GetFileName(folder) + ".zip");
                 }
-                if(verbose) prog.Percentage += progress;
+                if(_progress is not null)
+                    _progress.Percentage += progress;
             }catch (Exception e)
             {
-                prog?.Message(Message.LEVEL.ERROR, $"{e.Message}");
-                prog?.Stop();
+                _progress?.Message(Message.LEVEL.ERROR, $"{e.Message}");
+                _progress?.Stop();
                 Console.WriteLine(e);
             }
 
             return ValueTask.CompletedTask;
         });
+        _clock.Stop();
     }
 
-    private static void UnpackSingleFileOrFolder(byte[] key, string file, Progress? prog, bool method, bool traces)
+    private void UnpackObject(byte[] key, string file, bool method, bool traces)
     {
         #region header
         var guidFileName = Guid.Parse(Path.GetFileName(file).Replace(".enc", ""));
@@ -221,7 +242,7 @@ public static class Engine
         var header = br.ReadHeader();
         if(header.Guid != guidFileName || !Utils.CheckHash(Utils.HashBytes(key), header.Hash))
         {
-            prog?.Message(Message.LEVEL.WARN, $"Wrong password or file corrupted ({Path.GetFileName(file)})");
+            _progress?.Message(Message.LEVEL.WARN, $"Wrong password or file corrupted ({Path.GetFileName(file)})");
             return;
         }
 
@@ -298,20 +319,20 @@ public static class Engine
                 ZipFile.ExtractToDirectory($"{header.Name}.zip", "./");
 
                 if(traces){
-                    Utils.WipeFile($"{header.Name}.zip", prog);
+                    Utils.WipeFile($"{header.Name}.zip");
                 }else{
                     File.Delete($"{header.Name}.zip");
                 }
             }
         }
         File.Delete(file);
-        prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} decrypted successfully");
+        _progress?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} decrypted successfully");
         
         #endregion
     }
 
-    public static async Task UnpackFiles(byte[] key, string pwdHash, Progress? prog, bool method, bool traces) {
-        bool verbose = prog is not null;
+    public async Task UnpackFiles(byte[] key, string pwdHash, bool method, bool traces) {
+        _clock.Restart();
         List<string> files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
             .Where(f => f.EndsWith(".enc")).ToList();
 
@@ -325,17 +346,19 @@ public static class Engine
         await Parallel.ForEachAsync(files, (file, _) =>
         {
             try{
-                UnpackSingleFileOrFolder(key, file, prog, method, traces);
-                if(verbose) prog.Percentage += progress;
+                UnpackObject(key, file, method, traces);
+                if(_progress is not null)
+                    _progress.Percentage += progress;
             }catch (Exception e)
             {
-                prog?.Message(Message.LEVEL.ERROR, $"{e.Message}");
-                prog?.Stop();
+                _progress?.Message(Message.LEVEL.ERROR, $"{e.Message}");
+                _progress?.Stop();
                 Console.WriteLine(e);
             }
 
             return ValueTask.CompletedTask;
         });
+        _clock.Stop();
     }
     
     #endregion
