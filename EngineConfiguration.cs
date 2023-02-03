@@ -11,4 +11,14 @@ public struct EngineConfiguration {
     /// these regex are not going to be encrypted.
     /// </summary>
     public string Blacklist { get; init; }
+    
+    /// <summary>
+    /// If the RAM is to be used to encrypt/decrypt folders
+    /// </summary>
+    public bool UseRam { get; set; }
+    
+    /// <summary>
+    /// If we should completely erase the files from the disk.
+    /// </summary>
+    public bool ClearTraces { get; set; }
 }

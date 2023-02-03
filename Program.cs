@@ -79,8 +79,6 @@ public static class Program
     }
 
     private static async Task StartInteractive() {
-        var method = false;
-        var traces = false;
         
         Utils.ShowSplashScreen();
 
@@ -89,8 +87,10 @@ public static class Program
             "Info about program",
             "Exit"
         });
-        switch (state)
-        {
+        
+        bool useRam = false; // just initialize these because compiler doesnt like switches
+        bool clearTraces = false;
+        switch (state) {
             case "Info about program":
                 Utils.WriteLine("SafeFolder\n");
                 Utils.ShowInfoScreen();
@@ -100,27 +100,33 @@ public static class Program
             case "Exit":
                 return;
             case "Encrypt Files":
-                method = Prompt.Confirm("Encrypt files in memory? (Fast, but demands more ram)");
-                traces = Prompt.Confirm("Clear traces? (Very Slow, but more secure)");
+                useRam = Prompt.Confirm("Encrypt files in memory? (Fast, but demands more ram)", false);
+                clearTraces = Prompt.Confirm("Clear traces? (Very Slow, but more secure)", false);
                 break;
             case "Decrypt Files":
-                method = Prompt.Confirm("Decrypt files in memory? (Fast, but demands more ram)");
-                traces = Prompt.Confirm("Clear traces? (Very Slow, but more secure)");
+                useRam = Prompt.Confirm("Decrypt files in memory? (Fast, but demands more ram)");
+                clearTraces = Prompt.Confirm("Clear traces? (Very Slow, but more secure)");
                 break;
         }
 
         Progress progressBar = new();
 
-        string? pwd = Prompt.Password("Enter password", placeholder: "Take Care With CAPS-LOCK", validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
-        string? pwd2 = Prompt.Password("Re-Enter password", placeholder: "Take Care With CAPS-LOCK", validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
+        string? pwd = Prompt.Password("Enter password", 
+            placeholder: "Take Care With CAPS-LOCK", 
+            validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
+        string? pwd2 = Prompt.Password("Re-Enter password", 
+            placeholder: "Take Care With CAPS-LOCK", 
+            validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
         if (pwd != pwd2) 
             throw new Exception("Passwords do not match");
 
-        var key = Utils.DeriveKeyFromString(pwd);
-        var pwdHash = Utils.GetHash(Utils.HashBytes(key));
+        byte[] key = Utils.DeriveKeyFromString(pwd);
+        string pwdHash = Utils.GetHash(Utils.HashBytes(key));
         
         Engine engine = new(new EngineConfiguration {
-            ProgressBar = progressBar
+            ProgressBar = progressBar,
+            UseRam = useRam,
+            ClearTraces = clearTraces
         });
         
         switch (state) {
@@ -128,13 +134,13 @@ public static class Program
                 // have to encrypt
                 progressBar.Start();
                 progressBar.Message(Message.LEVEL.INFO, "Encrypting files...");
-                await engine.PackFiles(key, pwdHash, method, traces);
+                await engine.PackFiles(key, pwdHash);
                 break;
             case "Decrypt Files":
                 // have to decrypt
                 progressBar.Start();
                 progressBar.Message(Message.LEVEL.INFO, "Decrypting files...");
-                await engine.UnpackFiles(key, pwdHash, method, traces);
+                await engine.UnpackFiles(key, pwdHash);
                 break;
         }
         
@@ -191,16 +197,18 @@ public static class Program
         Engine engine = new(new EngineConfiguration {
             ProgressBar = null,
             FolderPath = opt.FolderPath,
-            Blacklist = opt.BlacklistFiles ?? ""
+            Blacklist = opt.BlacklistFiles ?? "",
+            UseRam = opt.InMemory,
+            ClearTraces = opt.ClearTraces
         });
         
         if(opt.Verbose)
             Utils.WriteLine($"{(opt.Encrypt ? "Encrypting" : "Decrypting")} files now");
         
         if (opt.Encrypt) {
-            await engine.PackFiles(key, pwdHash, opt.InMemory, opt.ClearTraces);
+            await engine.PackFiles(key, pwdHash);
         }else {
-            await engine.UnpackFiles(key, pwdHash, opt.InMemory, opt.ClearTraces);
+            await engine.UnpackFiles(key, pwdHash);
         }
 
         

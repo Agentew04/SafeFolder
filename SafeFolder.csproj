@@ -5,10 +5,10 @@
     <TargetFramework>net6.0</TargetFramework>
     <TrimmerDefaultAction>link</TrimmerDefaultAction>
     <Nullable>enable</Nullable>
-    <AssemblyVersion>2.0</AssemblyVersion>
-    <FileVersion>2.0</FileVersion>
+    <AssemblyVersion>2.2</AssemblyVersion>
+    <FileVersion>2.2</FileVersion>
     <NeutralLanguage>en</NeutralLanguage>
-    <Version>2.0</Version>
+    <Version>2.2</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
