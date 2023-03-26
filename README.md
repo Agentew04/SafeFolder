@@ -32,4 +32,5 @@ we use a very secure method called _hashing_, that prevents attackers from rever
 - [x] Protecting you data 🔒✔
 - [x] Faster zipping algorithm 🏃
 - [x] Add a command line interface(CLI) 👨‍💻
+- [ ] Accept Certificates and KeyPairs 🔑
 - [x] Be more user friendly 😁
