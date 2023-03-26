@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 
 namespace SafeFolder;
 
@@ -10,6 +11,9 @@ public class Header {
     public Guid Guid { get; set; } = Guid.NewGuid();
     public int IvLength { get; set; } = 0;
     public byte[] Iv { get; set; } = Array.Empty<byte>();
+    
+    [JsonIgnore]
+    public byte[] Key { get; init; }
 
     public Header(string hash, bool isFolder, string name, Guid guid, int ivLength, byte[] iv) {
         Hash = hash;

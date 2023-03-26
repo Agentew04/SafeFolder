@@ -75,7 +75,7 @@ public class Engine {
         using var outStream = File.Create(encFile);
         using var inStream = File.OpenRead(file);
         using var bw = new BinaryWriter(outStream);
-        bw.Write(header);
+        bw.Write(header, key);
         #endregion
 
         #region cryptography
@@ -113,7 +113,7 @@ public class Engine {
             #region stream init
             using var outStream = File.Create(encFile);
             using var bw = new BinaryWriter(outStream);
-            bw.Write(header);
+            bw.Write(header, key);
             #endregion
 
             #region cryptography
@@ -125,7 +125,7 @@ public class Engine {
             aes.Key = key;
             aes.IV = header.Iv;
             
-            using var cryptoStream = new CryptoStream(outStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
+            using CryptoStream cryptoStream = new(outStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
             Span<byte> buffer = stackalloc byte[1024];
             int bytesRead;
             while (( bytesRead= ms.Read(buffer) ) > 0)
@@ -155,7 +155,7 @@ public class Engine {
             using var inStream = File.OpenRead(zipName);
             using var bw = new BinaryWriter(outStream);
 
-            bw.Write(header);
+            bw.Write(header, key);
 
             using var aes = Aes.Create();
             aes.KeySize = KeySize;
@@ -303,7 +303,7 @@ public class Engine {
         Guid guidFileName = Guid.Parse(Path.GetFileName(file).Replace(".enc", ""));
         using FileStream inStream = new(file, FileMode.Open, FileAccess.Read);
         using BinaryReader br = new(inStream);
-        Header header = br.ReadHeader();
+        Header header = br.ReadHeader(key);
         if(header.Guid != guidFileName || !Utils.CheckHash(Utils.HashBytes(key), header.Hash))
         {
             _progress?.Message(Message.LEVEL.WARN, $"Wrong password or file corrupted ({Path.GetFileName(file)})");

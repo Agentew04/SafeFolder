@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Unicode;
 using PerrysNetConsole;
 
 namespace SafeFolder
@@ -74,58 +75,7 @@ a value) and it will recognize it! Defaults to current directory.
         }
         
         #endregion
-
-        #region Binary
-
-        /// <summary>
-        /// Writes a GUID bytes to a binary stream
-        /// </summary>
-        /// <param name="stream">The binary stream</param>
-        /// <param name="guid">The <see cref="Guid"/> to be written</param>
-        private static void Write(this BinaryWriter stream, Guid guid) => stream.Write(guid.ToByteArray());
-
-        /// <summary>
-        /// Reads a guid from a binary stream
-        /// </summary>
-        /// <param name="stream">The binary stream</param>
-        /// <returns>The guid that has been read</returns>
-        private static Guid ReadGuid(this BinaryReader stream) => new(stream.ReadBytes(16));
-            
-        /// <summary>
-        /// Writes the file header to the stream
-        /// </summary>
-        /// <param name="writer">The binaryWrite object</param>
-        /// <param name="header">The header object</param>
-        public static void Write(this BinaryWriter writer, Header header)
-        {
-            writer.Write(header.Hash);
-            writer.Write(header.IsFolder);
-            writer.Write(header.Name);
-            writer.Write(header.Guid);
-            writer.Write(header.IvLength);
-            writer.Write(header.Iv);
-        }
         
-        /// <summary>
-        /// Reads a header from a binary stream
-        /// </summary>
-        /// <param name="reader">the stream</param>
-        /// <returns>The header file that has been read</returns>
-        public static Header ReadHeader(this BinaryReader reader)
-        {
-            var header = new Header
-            {
-                Hash = reader.ReadString(),
-                IsFolder = reader.ReadBoolean(),
-                Name = reader.ReadString(),
-                Guid = reader.ReadGuid(),
-                IvLength = reader.ReadInt32(),
-            };
-            header.Iv = reader.ReadBytes(header.IvLength);
-            return header;
-        }
-        
-        #endregion
         
         #region Cryptography
         public static string HashBytes(byte[] bytes)
@@ -167,6 +117,42 @@ a value) and it will recognize it! Defaults to current directory.
             return BCrypt.Net.BCrypt.Verify(password, hash);
         }
 
+        /// <summary>
+        /// Encrypts a string using AES256 and a static IV.
+        /// </summary>
+        /// <param name="plaintext">The text that will be encrypted</param>
+        /// <param name="key">The key used</param>
+        /// <returns>The cyphertext</returns>
+        public static string EncryptString(string plaintext, byte[] key) {
+            byte[] iv = {
+                0xcc, 0x2c, 0x77, 0xfb, 0xba, 0x3a, 0x90, 0x22, 0x47, 0x11, 0x6e, 0x51, 0x04, 0x5e, 0x38, 0x7d/*,
+                0xe1, 0xa0, 0xc2, 0xf5, 0xbf, 0x8b, 0x5c, 0x1d, 0x34, 0xe9, 0x7e, 0x4f, 0x3d, 0xb5, 0x6f, 0xf4*/
+            };
+            Aes aes = Aes.Create();
+            aes.Key = key;
+
+            byte[] plainBytes = Encoding.UTF8.GetBytes(plaintext);;
+            return Convert.ToHexString(aes.EncryptCbc(plainBytes, iv));
+        }
+
+        /// <summary>
+        /// Decrypts a string using AES256 and a fixed IV.
+        /// </summary>
+        /// <param name="cypherText">The ciphertext to be decrypted</param>
+        /// <param name="key">The key used to decrypt</param>
+        /// <returns>The plaintext</returns>
+        public static string DecryptString(string cypherText, byte[] key) {
+            byte[] iv = {
+                0xcc, 0x2c, 0x77, 0xfb, 0xba, 0x3a, 0x90, 0x22, 0x47, 0x11, 0x6e, 0x51, 0x04, 0x5e, 0x38, 0x7d/*,
+                0xe1, 0xa0, 0xc2, 0xf5, 0xbf, 0x8b, 0x5c, 0x1d, 0x34, 0xe9, 0x7e, 0x4f, 0x3d, 0xb5, 0x6f, 0xf4*/
+            };
+            Aes aes = Aes.Create();
+            aes.Key = key;
+
+            byte[] cypherBytes = Convert.FromHexString(cypherText);
+            return Encoding.UTF8.GetString(aes.DecryptCbc(cypherBytes, iv));
+        }
+        
         /// <summary>
         /// Deletes a file in a secure way by overwriting it with zeros.
         /// </summary>
