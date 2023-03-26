@@ -7,11 +7,11 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.IO.Compression;
+using System.Text.RegularExpressions;
 
 namespace SafeFolder;
 
-public static class Engine
-{
+public class Engine {
     private const int KeySize = 256;
     private const int BlockSize = 128;
     private const PaddingMode PaddingMode = System.Security.Cryptography.PaddingMode.PKCS7;
@@ -19,28 +19,63 @@ public static class Engine
     
     private static readonly string _safeFolderName = Process.GetCurrentProcess().ProcessName;
 
-    #region Files
+    private readonly string _folderPath;
+    private readonly Progress? _progress;
+    private readonly Stopwatch _clock = new();
+    private readonly List<Regex> _blacklist = new();
+    private readonly bool _useRam;
+    private readonly bool _clearTraces;
 
-    private static void PackSingleFile(byte[] key, string pwdHash, string file)
-    {
-        #region header
-        var iv = Utils.GenerateIv();
-        var guid = Guid.NewGuid();
-        var encFile = guid.ToString().Replace("-", "") + ".enc";
-        var header = new Header{
+    public TimeSpan Elapsed => _clock.Elapsed; 
+    
+    # region Constructor
+
+    public Engine(EngineConfiguration configuration) {
+        _folderPath = configuration.FolderPath;
+        _progress = configuration.ProgressBar;
+        _useRam = configuration.UseRam;
+        _clearTraces = configuration.ClearTraces;
+
+        if (string.IsNullOrWhiteSpace(configuration.Blacklist)) 
+            return;
+        string[] regexes = configuration.Blacklist.Split(';');
+        foreach (string regex in regexes) {
+            _blacklist.Add(new Regex(regex + "$"));
+        }
+    }
+    
+    #endregion
+
+    /// <summary>
+    /// Returns a built header. Must set <see cref="Header.Hash"/> and <see cref="Header.Name"/>.
+    /// </summary>
+    /// <returns></returns>
+    private static (Header,string) GenerateHeader(bool isFolder) {
+        byte[] iv = Utils.GenerateIv();
+        Guid guid = Guid.NewGuid();
+        string encFile = guid.ToString().Replace("-", "") + ".enc";
+        Header header = new Header{
+            IsFolder = isFolder,
             Guid = guid,
-            Hash = pwdHash,
-            Name = file,
             IvLength = iv.Length,
             Iv = iv
         };
-        #endregion
+        return (header, encFile);
+    }
+
+    #region Files
+
+    private static void PackSingleFile(byte[] key, string pwdHash, string file) {
+
+        (Header header, string encFile) = GenerateHeader(false);
+        header.Hash = pwdHash;
+        header.Name = file;
 
         #region stream init
         using var outStream = File.Create(encFile);
         using var inStream = File.OpenRead(file);
         using var bw = new BinaryWriter(outStream);
-        bw.Write(header);
+        bw.Write(header, key);
         #endregion
 
         #region cryptography
@@ -50,49 +85,35 @@ public static class Engine
         aes.Padding = PaddingMode;
         aes.Mode = CipherMode;
         aes.Key = key;
-        aes.IV = iv;
+        aes.IV = header.Iv;
         
         using var cryptoStream = new CryptoStream(outStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
         Span<byte> buffer = stackalloc byte[1024];
         int bytesRead;
-        while ( (bytesRead= inStream.Read(buffer)) > 0)
-        {
+        while ( (bytesRead= inStream.Read(buffer)) > 0) {
             cryptoStream.Write(buffer[..bytesRead]);
         }
 
         #endregion
     }
-    private static void PackSingleFolder(byte[] key, string pwdHash, string folder, bool method)
-    {
-        if (method){
-            var dirInfo = new DirectoryInfo(folder);
-            using var ms = new MemoryStream();
-            using var zip = new Ionic.Zip.ZipFile(encoding: System.Text.Encoding.UTF8);
+    private void PackSingleFolder(byte[] key, string pwdHash, string folder) {
+        if (_useRam){
+            DirectoryInfo dirInfo = new(folder);
+            using MemoryStream ms = new();
+            using Ionic.Zip.ZipFile zip = new(encoding: System.Text.Encoding.UTF8);
 
             zip.AddDirectory(folder, dirInfo.Name);
             zip.Save(ms);
             ms.Seek(0, SeekOrigin.Begin);
             
+            (Header header, string encFile) = GenerateHeader(true);
+            header.Hash = pwdHash;
+            header.Name = dirInfo.Name;
             
-            #region header
-            var iv = Utils.GenerateIv();
-            var guid = Guid.NewGuid();
-            var encFile = guid.ToString().Replace("-", "") + ".enc";
-            var header = new Header{
-                IsFolder = true,
-                Guid = guid,
-                Hash = pwdHash,
-                Name = dirInfo.Name,
-                IvLength = iv.Length,
-                Iv = iv
-            };
-            
-            #endregion
-
             #region stream init
             using var outStream = File.Create(encFile);
             using var bw = new BinaryWriter(outStream);
-            bw.Write(header);
+            bw.Write(header, key);
             #endregion
 
             #region cryptography
@@ -102,12 +123,12 @@ public static class Engine
             aes.Padding = PaddingMode;
             aes.Mode = CipherMode;
             aes.Key = key;
-            aes.IV = iv;
+            aes.IV = header.Iv;
             
-            using var cryptoStream = new CryptoStream(outStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
+            using CryptoStream cryptoStream = new(outStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
             Span<byte> buffer = stackalloc byte[1024];
             int bytesRead;
-            while ( (bytesRead= ms.Read(buffer)) > 0)
+            while (( bytesRead= ms.Read(buffer) ) > 0)
             {
                 cryptoStream.Write(buffer[..bytesRead]);
             }
@@ -134,7 +155,7 @@ public static class Engine
             using var inStream = File.OpenRead(zipName);
             using var bw = new BinaryWriter(outStream);
 
-            bw.Write(header);
+            bw.Write(header, key);
 
             using var aes = Aes.Create();
             aes.KeySize = KeySize;
@@ -155,13 +176,17 @@ public static class Engine
     }
     
     #pragma warning disable CS8602
-    public static async Task PackFiles(byte[] key, string pwdHash, Progress? prog, bool method, bool traces) {
-        bool verbose = prog is not null;
-        List<string> files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
+    public async Task PackFiles(byte[] key, string pwdHash) {
+        _clock.Restart();
+        bool verbose = _progress is not null;
+        List<string> files = Directory.EnumerateFiles(_folderPath)
             .Where(f => !Path.GetFileName(f).Contains(_safeFolderName) && !f.EndsWith(".pdb") && !f.EndsWith(".enc"))
+            .Where(file => !_blacklist.Any(regex => regex.Match(file).Success))
             .ToList();
-
-        List<string> folders = Directory.GetDirectories(Directory.GetCurrentDirectory()).ToList();
+        
+        List<string> folders = Directory.GetDirectories(_folderPath)
+            .Where(folder => !_blacklist.Any(regex => regex.Match(folder).Success))
+            .ToList();
 
         double progress = 100.0 / (files.Count + folders.Count == 0 ? 100 : files.Count + folders.Count);
 
@@ -170,17 +195,16 @@ public static class Engine
         {
             try{
                 PackSingleFile(key, pwdHash, Path.GetFileName(file));
-                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} encrypted successfully");
-                if (traces){
-                    Utils.WipeFile(file, prog);
+                _progress?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} encrypted successfully");
+                if (_clearTraces){
+                    Utils.WipeFile(file);
                 }else{
                     File.Delete(file);
                 }
-                if(verbose) prog.Percentage += progress;
-            }catch (Exception e)
-            {
-                prog?.Message(Message.LEVEL.ERROR, $"{e.Message}");
-                prog?.Stop();
+                if(verbose) _progress.Percentage += progress;
+            }catch (Exception e) {
+                _progress?.Message(Message.LEVEL.ERROR, $"{e.Message}");
+                _progress?.Stop();
                 Console.WriteLine(e);
             }
 
@@ -191,153 +215,142 @@ public static class Engine
         await Parallel.ForEachAsync(folders, (folder, _) =>
         {
             try{
-                PackSingleFolder(key, pwdHash, Path.GetFileName(folder), method);
-                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} encrypted successfully");
-                if (traces){
-                    Utils.WipeFolder(folder, prog);
-                    Utils.WipeFile($"{folder}.zip", prog);
+                PackSingleFolder(key, pwdHash, Path.GetFileName(folder));
+                _progress?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} encrypted successfully");
+                if (_clearTraces){
+                    bool result = Utils.WipeFolder(folder);
+                    result = result && Utils.WipeFile($"{folder}.zip");
+                    if(result)
+                        _progress?.Message(Message.LEVEL.DEBUG, $"Wiped folder {folder}");
+                    else 
+                        _progress?.Message(Message.LEVEL.ERROR,$"Error wiping folder {folder}");
+                    
                 }else{
                     Directory.Delete(folder, true);
                     File.Delete(Path.GetFileName(folder) + ".zip");
                 }
-                if(verbose) prog.Percentage += progress;
+                if(_progress is not null)
+                    _progress.Percentage += progress;
             }catch (Exception e)
             {
-                prog?.Message(Message.LEVEL.ERROR, $"{e.Message}");
-                prog?.Stop();
+                _progress?.Message(Message.LEVEL.ERROR, $"{e.Message}");
+                _progress?.Stop();
                 Console.WriteLine(e);
             }
 
             return ValueTask.CompletedTask;
         });
+        _clock.Stop();
     }
 
-    private static void UnpackSingleFileOrFolder(byte[] key, string file, Progress? prog, bool method, bool traces)
-    {
+    private void UnpackSingleFile(Header header, byte[] key, Stream dataStream) {
+        using FileStream outStream = File.Create(header.Name);
+        using Aes aes = Aes.Create();
+        aes.KeySize = KeySize;
+        aes.BlockSize = BlockSize;
+        aes.Padding = PaddingMode;
+        aes.Mode = CipherMode;
+        aes.Key = key;
+        aes.IV = header.Iv;
+
+        using CryptoStream cryptoStream = new(dataStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
+        Span<byte> buffer = stackalloc byte[1024];
+        int bytesRead;
+        while ((bytesRead = cryptoStream.Read(buffer)) > 0)
+            outStream.Write(buffer[..bytesRead]);
+
+        dataStream.Close();
+    }
+
+    private void UnpackSingleFolder(Header header, byte[] key, Stream dataStream) {
+        Stream outStream;
+        if (_useRam)
+            outStream = new MemoryStream();
+        else
+            outStream = File.Create($"{header.Name}.zip");
+        using Aes aes = Aes.Create();
+        aes.KeySize = KeySize;
+        aes.BlockSize = BlockSize;
+        aes.Padding = PaddingMode;
+        aes.Mode = CipherMode;
+        aes.Key = key;
+        aes.IV = header.Iv;
+
+        using CryptoStream cryptoStream = new(dataStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
+        Span<byte> buffer = stackalloc byte[1024];
+        int bytesRead;
+        while ((bytesRead = cryptoStream.Read(buffer)) > 0)
+            outStream.Write(buffer[..bytesRead]);
+
+        if (_useRam) {
+            outStream.Seek(0, SeekOrigin.Begin);
+            using Ionic.Zip.ZipFile? zip = Ionic.Zip.ZipFile.Read(outStream);
+            zip.ExtractAll(_folderPath , Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
+        }else {
+            dataStream.Close();
+            outStream.Close();
+            ZipFile.ExtractToDirectory($"{header.Name}.zip", "./");
+            if(_clearTraces){
+                Utils.WipeFile($"{header.Name}.zip");
+            }else{
+                File.Delete($"{header.Name}.zip");
+            }
+        }
+    }
+    
+    private void UnpackObject(byte[] key, string file) {
         #region header
-        var guidFileName = Guid.Parse(Path.GetFileName(file).Replace(".enc", ""));
-        using var inStream = new FileStream(file, FileMode.Open, FileAccess.Read);
-        using var br = new BinaryReader(inStream);
-        var header = br.ReadHeader();
+        Guid guidFileName = Guid.Parse(Path.GetFileName(file).Replace(".enc", ""));
+        using FileStream inStream = new(file, FileMode.Open, FileAccess.Read);
+        using BinaryReader br = new(inStream);
+        Header header = br.ReadHeader(key);
         if(header.Guid != guidFileName || !Utils.CheckHash(Utils.HashBytes(key), header.Hash))
         {
-            prog?.Message(Message.LEVEL.WARN, $"Wrong password or file corrupted ({Path.GetFileName(file)})");
+            _progress?.Message(Message.LEVEL.WARN, $"Wrong password or file corrupted ({Path.GetFileName(file)})");
             return;
         }
 
-        var isFolder = header.IsFolder;
         #endregion
 
         #region criptography
         
-        if (!isFolder)
-        {
-            // file
-            using var outStream = File.Create(header.Name);
-            using var aes = Aes.Create();
-            aes.KeySize = KeySize;
-            aes.BlockSize = BlockSize;
-            aes.Padding = PaddingMode;
-            aes.Mode = CipherMode;
-            aes.Key = key;
-            aes.IV = header.Iv;
-
-            using var cryptoStream = new CryptoStream(inStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
-            Span<byte> buffer = stackalloc byte[1024];
-            int bytesRead;
-            while ((bytesRead = cryptoStream.Read(buffer)) > 0)
-                outStream.Write(buffer[..bytesRead]);
-
-            inStream.Close();
-        }
-        else
-        {
-            // directory
-            if (method){
-                using var ms = new MemoryStream();
-                using var aes = Aes.Create();
-                aes.KeySize = KeySize;
-                aes.BlockSize = BlockSize;
-                aes.Padding = PaddingMode;
-                aes.Mode = CipherMode;
-                aes.Key = key;
-                aes.IV = header.Iv;
-
-                using var cryptoStream = new CryptoStream(inStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
-                Span<byte> buffer = stackalloc byte[1024];
-                int bytesRead;
-                while ((bytesRead = cryptoStream.Read(buffer)) > 0)
-                    ms.Write(buffer[..bytesRead]);
-                
-                ms.Seek(0, SeekOrigin.Begin);
-                
-                // ms has a zip file
-                using var zip = Ionic.Zip.ZipFile.Read(ms);
-                
-                
-                zip.ExtractAll(Directory.GetCurrentDirectory() , Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
-            }else{
-                using var outStream = File.Create($"{header.Name}.zip");
-                using var aes = Aes.Create();
-                aes.KeySize = KeySize;
-                aes.BlockSize = BlockSize;
-                aes.Padding = PaddingMode;
-                aes.Mode = CipherMode;
-                aes.Key = key;
-                aes.IV = header.Iv;
-
-                using var cryptoStream = new CryptoStream(inStream, aes.CreateDecryptor(), CryptoStreamMode.Read);
-                Span<byte> buffer = stackalloc byte[1024];
-                int bytesRead;
-                while ((bytesRead = cryptoStream.Read(buffer)) > 0)
-                    outStream.Write(buffer[..bytesRead]);
-
-                inStream.Close();
-                outStream.Close();
-
-                ZipFile.ExtractToDirectory($"{header.Name}.zip", "./");
-
-                if(traces){
-                    Utils.WipeFile($"{header.Name}.zip", prog);
-                }else{
-                    File.Delete($"{header.Name}.zip");
-                }
-            }
+        if (!header.IsFolder) {
+            UnpackSingleFile(header, key, inStream);
+        }else {
+            UnpackSingleFolder(header, key, inStream);
         }
         File.Delete(file);
-        prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} decrypted successfully");
+        _progress?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} decrypted successfully");
         
         #endregion
     }
 
-    public static async Task UnpackFiles(byte[] key, string pwdHash, Progress? prog, bool method, bool traces) {
-        bool verbose = prog is not null;
-        List<string> files = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
+    public async Task UnpackFiles(byte[] key, string pwdHash) {
+        _clock.Restart();
+        List<string> files = Directory.EnumerateFiles(_folderPath)
             .Where(f => f.EndsWith(".enc")).ToList();
 
-        List<string> zips = Directory.EnumerateFiles(Directory.GetCurrentDirectory())
-            .Where(f => f.EndsWith(".zip")).ToList();
-
-        double progress = 100.0 / (!files.Any() ? 100 : files.Count + zips.Count);
-        
+        double progress = 100.0 / (!files.Any() ? 100 : files.Count );
 
         // decrypt files and folders
         await Parallel.ForEachAsync(files, (file, _) =>
         {
             try{
-                UnpackSingleFileOrFolder(key, file, prog, method, traces);
-                if(verbose) prog.Percentage += progress;
+                UnpackObject(key, file);
+                if(_progress is not null)
+                    _progress.Percentage += progress;
             }catch (Exception e)
             {
-                prog?.Message(Message.LEVEL.ERROR, $"{e.Message}");
-                prog?.Stop();
+                _progress?.Message(Message.LEVEL.ERROR, $"{e.Message}");
+                _progress?.Stop();
                 Console.WriteLine(e);
             }
 
             return ValueTask.CompletedTask;
         });
+        _clock.Stop();
     }
     
     #endregion
+
 }
-#pragma warning restore CS8602

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Unicode;
 using PerrysNetConsole;
 
 namespace SafeFolder
@@ -10,18 +11,16 @@ namespace SafeFolder
 
         #region IO
 
-        public static string GetVersion()
-        {
+        private static string GetVersion() {
             //get version from assembly
-            string version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
-            return version;
+            string? version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString();
+            return version ?? "";
         }
 
         /// <summary>
         /// Shows the splash screen.
         /// </summary>
-        public static void ShowSplashScreen()
-        {
+        public static void ShowSplashScreen() {
             Console.WriteLine(@$"
 =============================================
 
@@ -35,8 +34,7 @@ namespace SafeFolder
         /// <summary>
         /// Shows the info screen.
         /// </summary>
-        public static void ShowInfoScreen()
-        {
+        public static void ShowInfoScreen() {
             Console.WriteLine(@"
 Encrypt/Decrypt files in memory: Fast, but demands more ram.
 
@@ -55,7 +53,8 @@ Safe folder now has full CLI support! Flags are now available to use in the comm
     -e  --encrypt             => Encrypt the files.
     -d  --decrypt             => Decrypt the files.
     -p  --password <password> => Set the password to use.
-    -V  --verbosity <0|1>     => Sets the verbosity level of the program.
+    -V  --verbosity           => If enabled, an output will be shown.
+    -b  --blacklist <regex>   => Multiple regexes separated by semicolon. Files that match these are ignored.
 
 Also, include the path of the folder that will be encrypted anywhere on the arguments (except after a flag that accepts
 a value) and it will recognize it! Defaults to current directory.
@@ -67,8 +66,7 @@ a value) and it will recognize it! Defaults to current directory.
         /// </summary>
         /// <param name="message">The message, if not ends with \n, \n will be appended</param>
         /// <param name="color">The color to write the message</param>
-        public static void WriteLine(string message, ConsoleColor color = ConsoleColor.White)
-        {
+        public static void WriteLine(string message, ConsoleColor color = ConsoleColor.White) {
             Console.ForegroundColor = color;
             if(!message.EndsWith("\n"))
                 message+= "\n";
@@ -77,58 +75,7 @@ a value) and it will recognize it! Defaults to current directory.
         }
         
         #endregion
-
-        #region Binary
-
-        /// <summary>
-        /// Writes a GUID bytes to a binary stream
-        /// </summary>
-        /// <param name="stream">The binary stream</param>
-        /// <param name="guid">The <see cref="Guid"/> to be written</param>
-        private static void Write(this BinaryWriter stream, Guid guid) => stream.Write(guid.ToByteArray());
-
-        /// <summary>
-        /// Reads a guid from a binary stream
-        /// </summary>
-        /// <param name="stream">The binary stream</param>
-        /// <returns>The guid that has been read</returns>
-        private static Guid ReadGuid(this BinaryReader stream) => new(stream.ReadBytes(16));
-            
-        /// <summary>
-        /// Writes the file header to the stream
-        /// </summary>
-        /// <param name="writer">The binaryWrite object</param>
-        /// <param name="header">The header object</param>
-        public static void Write(this BinaryWriter writer, Header header)
-        {
-            writer.Write(header.Hash);
-            writer.Write(header.IsFolder);
-            writer.Write(header.Name);
-            writer.Write(header.Guid);
-            writer.Write(header.IvLength);
-            writer.Write(header.Iv);
-        }
         
-        /// <summary>
-        /// Reads a header from a binary stream
-        /// </summary>
-        /// <param name="reader">the stream</param>
-        /// <returns>The header file that has been read</returns>
-        public static Header ReadHeader(this BinaryReader reader)
-        {
-            var header = new Header
-            {
-                Hash = reader.ReadString(),
-                IsFolder = reader.ReadBoolean(),
-                Name = reader.ReadString(),
-                Guid = reader.ReadGuid(),
-                IvLength = reader.ReadInt32(),
-            };
-            header.Iv = reader.ReadBytes(header.IvLength);
-            return header;
-        }
-        
-        #endregion
         
         #region Cryptography
         public static string HashBytes(byte[] bytes)
@@ -170,18 +117,50 @@ a value) and it will recognize it! Defaults to current directory.
             return BCrypt.Net.BCrypt.Verify(password, hash);
         }
 
+        /// <summary>
+        /// Encrypts a string using AES256 and a static IV.
+        /// </summary>
+        /// <param name="plaintext">The text that will be encrypted</param>
+        /// <param name="key">The key used</param>
+        /// <returns>The cyphertext</returns>
+        public static string EncryptString(string plaintext, byte[] key) {
+            byte[] iv = {
+                0xcc, 0x2c, 0x77, 0xfb, 0xba, 0x3a, 0x90, 0x22, 0x47, 0x11, 0x6e, 0x51, 0x04, 0x5e, 0x38, 0x7d/*,
+                0xe1, 0xa0, 0xc2, 0xf5, 0xbf, 0x8b, 0x5c, 0x1d, 0x34, 0xe9, 0x7e, 0x4f, 0x3d, 0xb5, 0x6f, 0xf4*/
+            };
+            Aes aes = Aes.Create();
+            aes.Key = key;
+
+            byte[] plainBytes = Encoding.UTF8.GetBytes(plaintext);;
+            return Convert.ToHexString(aes.EncryptCbc(plainBytes, iv));
+        }
+
+        /// <summary>
+        /// Decrypts a string using AES256 and a fixed IV.
+        /// </summary>
+        /// <param name="cypherText">The ciphertext to be decrypted</param>
+        /// <param name="key">The key used to decrypt</param>
+        /// <returns>The plaintext</returns>
+        public static string DecryptString(string cypherText, byte[] key) {
+            byte[] iv = {
+                0xcc, 0x2c, 0x77, 0xfb, 0xba, 0x3a, 0x90, 0x22, 0x47, 0x11, 0x6e, 0x51, 0x04, 0x5e, 0x38, 0x7d/*,
+                0xe1, 0xa0, 0xc2, 0xf5, 0xbf, 0x8b, 0x5c, 0x1d, 0x34, 0xe9, 0x7e, 0x4f, 0x3d, 0xb5, 0x6f, 0xf4*/
+            };
+            Aes aes = Aes.Create();
+            aes.Key = key;
+
+            byte[] cypherBytes = Convert.FromHexString(cypherText);
+            return Encoding.UTF8.GetString(aes.DecryptCbc(cypherBytes, iv));
+        }
         
         /// <summary>
-        /// Deletes a file in a secure way by overwriting it with
-        /// random garbage data n times.
+        /// Deletes a file in a secure way by overwriting it with zeros.
         /// </summary>
-        /// <param name="prog">The progessbar object, null if it's on a cli run</param>
         /// <param name="filename">Full path of the file to be deleted</param>
-        public static void WipeFile(string filename, Progress? prog) {
-            bool verbose = prog is not null;
+        public static bool WipeFile(string filename) {
             try
             {
-                if (!File.Exists(filename)) return;
+                if (!File.Exists(filename)) return true;
                 // Set the files attributes to normal in case it's read-only.
                 File.SetAttributes(filename, FileAttributes.Normal);
 
@@ -206,7 +185,7 @@ a value) and it will recognize it! Defaults to current directory.
                 inputStream.Close();
 
                 // wipe dates
-                var dt = new DateTime(2037, 1, 1, 0, 0, 0);
+                DateTime dt = new(2037, 1, 1, 0, 0, 0);
                 File.SetCreationTime(filename, dt);
                 File.SetLastAccessTime(filename, dt);
                 File.SetLastWriteTime(filename, dt);
@@ -217,40 +196,34 @@ a value) and it will recognize it! Defaults to current directory.
 
                 // Finally, delete the file
                 File.Delete(filename);
-
-                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(filename)} cleared traces successfully");
+                return true;
             }
-            catch(Exception e) {
-                if (verbose)
-                    prog?.Message(Message.LEVEL.ERROR, $"Error wiping file ({Path.GetFileName(filename)})" + e.Message);
-                else
-                    WriteLine($"Error wiping file ({Path.GetFileName(filename)}): {e.Message}", ConsoleColor.Red);
+            catch(Exception) {
+                return false;
             }
         }
 
-        public static void WipeFolder(string folder, Progress? prog)
+        /// <summary>
+        /// Recursively Wipes all files inside a folder and its subfolders.
+        /// </summary>
+        /// <param name="folder">The folder to be wiped</param>
+        /// <returns>If the operation was successful or not.</returns>
+        public static bool WipeFolder(string folder)
         {
-            try
-            {
+            try {
                 if (!Directory.Exists(folder)) 
-                    return;
+                    return true;
 
                 DirectoryInfo dir = new(folder);
-                FileInfo[] files = dir.GetFiles();
-                DirectoryInfo[] dirs = dir.GetDirectories();
+                
+                foreach (FileInfo file in dir.GetFiles())
+                    WipeFile(file.FullName);
 
-                foreach (FileInfo file in files)
-                {
-                    WipeFile(file.FullName, prog);
-                }
-
-                foreach (DirectoryInfo subDir in dirs)
-                {
-                    WipeFolder(subDir.FullName, prog);
-                }
+                foreach (DirectoryInfo subDir in dir.GetDirectories())
+                    WipeFolder(subDir.FullName);
 
                 // wipe dates
-                DateTime dt = new DateTime(2037, 1, 1, 0, 0, 0);
+                DateTime dt = new(2037, 1, 1, 0, 0, 0);
                 Directory.SetCreationTime(folder, dt);
                 Directory.SetLastAccessTime(folder, dt);
                 Directory.SetLastWriteTime(folder, dt);
@@ -261,12 +234,10 @@ a value) and it will recognize it! Defaults to current directory.
 
                 // Finally, delete the folder
                 Directory.Delete(folder, true);
-
-                prog?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} cleared traces successfully");
+                return true;
             }
-            catch(Exception e)
-            {
-                prog?.Message(Message.LEVEL.ERROR, $"Error wiping folder ({Path.GetFileName(folder)})" + e.Message);
+            catch(Exception) {
+                return false;
             }
         }
         
