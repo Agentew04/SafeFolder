@@ -174,13 +174,25 @@ public class Engine {
             }
         }
     }
+
+    private static double PercentPerItem(int totalItems) {
+        if (totalItems <= 0) {
+            return 1;
+        }
+        return 100 / (double)totalItems;
+
+    }
     
     #pragma warning disable CS8602
     public async Task PackFiles(byte[] key, string pwdHash) {
         _clock.Restart();
         bool verbose = _progress is not null;
         List<string> files = Directory.EnumerateFiles(_folderPath)
-            .Where(f => !Path.GetFileName(f).Contains(_safeFolderName) && !f.EndsWith(".pdb") && !f.EndsWith(".enc"))
+            .Where(f => !Path.GetFileName(f).Contains(_safeFolderName)) // is not executable
+            .Where(f => !f.EndsWith(".enc"))
+#if DEBUG
+            .Where(f => !(f.EndsWith(".pdb"))
+#endif
             .Where(file => !_blacklist.Any(regex => regex.Match(file).Success))
             .ToList();
         
@@ -188,7 +200,7 @@ public class Engine {
             .Where(folder => !_blacklist.Any(regex => regex.Match(folder).Success))
             .ToList();
 
-        double progress = 100.0 / (files.Count + folders.Count == 0 ? 100 : files.Count + folders.Count);
+        double progressPerItem = PercentPerItem(files.Count + folders.Count);
 
         // encrypt files
         await Parallel.ForEachAsync(files, (file, _) =>
@@ -196,12 +208,8 @@ public class Engine {
             try{
                 PackSingleFile(key, pwdHash, Path.GetFileName(file));
                 _progress?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} encrypted successfully");
-                if (_clearTraces){
-                    Utils.WipeFile(file);
-                }else{
-                    File.Delete(file);
-                }
-                if(verbose) _progress.Percentage += progress;
+                Utils.WipePath(file, _clearTraces);
+                if(verbose) _progress.Percentage += progressPerItem;
             }catch (Exception e) {
                 _progress?.Message(Message.LEVEL.ERROR, $"{e.Message}");
                 _progress?.Stop();
@@ -217,20 +225,10 @@ public class Engine {
             try{
                 PackSingleFolder(key, pwdHash, Path.GetFileName(folder));
                 _progress?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} encrypted successfully");
-                if (_clearTraces){
-                    bool result = Utils.WipeFolder(folder);
-                    result = result && Utils.WipeFile($"{folder}.zip");
-                    if(result)
-                        _progress?.Message(Message.LEVEL.DEBUG, $"Wiped folder {folder}");
-                    else 
-                        _progress?.Message(Message.LEVEL.ERROR,$"Error wiping folder {folder}");
-                    
-                }else{
-                    Directory.Delete(folder, true);
-                    File.Delete(Path.GetFileName(folder) + ".zip");
-                }
+                Utils.WipePath(folder, _clearTraces);
+                Utils.WipePath($"{folder}.zip", _clearTraces);
                 if(_progress is not null)
-                    _progress.Percentage += progress;
+                    _progress.Percentage += progressPerItem;
             }catch (Exception e)
             {
                 _progress?.Message(Message.LEVEL.ERROR, $"{e.Message}");
@@ -290,11 +288,7 @@ public class Engine {
             dataStream.Close();
             outStream.Close();
             ZipFile.ExtractToDirectory($"{header.Name}.zip", "./");
-            if(_clearTraces){
-                Utils.WipeFile($"{header.Name}.zip");
-            }else{
-                File.Delete($"{header.Name}.zip");
-            }
+            Utils.WipePath($"{header.Name}.zip", _clearTraces);
         }
     }
     

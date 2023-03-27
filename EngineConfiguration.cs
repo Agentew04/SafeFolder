@@ -13,12 +13,12 @@ public struct EngineConfiguration {
     public string Blacklist { get; init; }
     
     /// <summary>
-    /// If the RAM is to be used to encrypt/decrypt folders
+    /// If the RAM is to be used to encrypt/decrypt folders. If false, the disk is used instead
     /// </summary>
-    public bool UseRam { get; set; }
+    public bool UseRam { get; init; }
     
     /// <summary>
     /// If we should completely erase the files from the disk.
     /// </summary>
-    public bool ClearTraces { get; set; }
+    public bool ClearTraces { get; init; }
 }

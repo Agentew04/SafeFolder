@@ -2,8 +2,6 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Unicode;
-using PerrysNetConsole;
 
 namespace SafeFolder
 {
@@ -131,7 +129,7 @@ a value) and it will recognize it! Defaults to current directory.
             Aes aes = Aes.Create();
             aes.Key = key;
 
-            byte[] plainBytes = Encoding.UTF8.GetBytes(plaintext);;
+            byte[] plainBytes = Encoding.UTF8.GetBytes(plaintext);
             return Convert.ToHexString(aes.EncryptCbc(plainBytes, iv));
         }
 
@@ -154,53 +152,71 @@ a value) and it will recognize it! Defaults to current directory.
         }
         
         /// <summary>
-        /// Deletes a file in a secure way by overwriting it with zeros.
+        /// Deletes a file or a folder. Can wipe the data completely from the hard drive also.
         /// </summary>
-        /// <param name="filename">Full path of the file to be deleted</param>
-        public static bool WipeFile(string filename) {
-            try
-            {
-                if (!File.Exists(filename)) return true;
-                // Set the files attributes to normal in case it's read-only.
-                File.SetAttributes(filename, FileAttributes.Normal);
-
-                // Calculate the total number of sectors in the file.
-                var sectors = (int)Math.Ceiling(new FileInfo(filename).Length/512.0);
-                    
-                // Create a dummy-buffer the size of a sector.
-                var buffer = new byte[512];
-
-                // Open a FileStream to the file.
-                var inputStream = new FileStream(filename, FileMode.Open);
-
-                // Loop all sectors
-                for (var i = 0; i < sectors; i++)
-                {
-                    // write zeros
-                    inputStream.Write(buffer, 0, buffer.Length);
-                }
-                // truncate file
-                inputStream.SetLength(0);
-                // Close the stream.
-                inputStream.Close();
-
-                // wipe dates
-                DateTime dt = new(2037, 1, 1, 0, 0, 0);
-                File.SetCreationTime(filename, dt);
-                File.SetLastAccessTime(filename, dt);
-                File.SetLastWriteTime(filename, dt);
-
-                File.SetCreationTimeUtc(filename, dt);
-                File.SetLastAccessTimeUtc(filename, dt);
-                File.SetLastWriteTimeUtc(filename, dt);
-
-                // Finally, delete the file
-                File.Delete(filename);
-                return true;
-            }
-            catch(Exception) {
+        /// <param name="filename">Full path of the file or folder to be deleted</param>
+        public static bool WipePath(string path, bool wipe) {
+            bool isFolder = Directory.Exists(path);
+            bool isFile = File.Exists(path);
+            if (!isFolder && !isFile) {
                 return false;
             }
+
+            switch (isFile) {
+                case true when !isFolder: {
+                    if (wipe) {
+                        // Set the files attributes to normal in case it's read-only.
+                        File.SetAttributes(path, FileAttributes.Normal);
+
+                        // Calculate the total number of sectors in the file.
+                        var sectors = (int)Math.Ceiling(new FileInfo(path).Length / 512.0);
+
+                        // Create a dummy-buffer the size of a sector.
+                        var buffer = new byte[512];
+
+                        // Open a FileStream to the file.
+                        var inputStream = new FileStream(path, FileMode.Open);
+
+                        // Loop all sectors
+                        for (var i = 0; i < sectors; i++) {
+                            // write zeros
+                            inputStream.Write(buffer, 0, buffer.Length);
+                        }
+
+                        // truncate file
+                        inputStream.SetLength(0);
+                        // Close the stream.
+                        inputStream.Close();
+
+                        // wipe dates
+                        DateTime dt = new(2037, 1, 1, 0, 0, 0);
+                        File.SetCreationTime(path, dt);
+                        File.SetLastAccessTime(path, dt);
+                        File.SetLastWriteTime(path, dt);
+
+                        File.SetCreationTimeUtc(path, dt);
+                        File.SetLastAccessTimeUtc(path, dt);
+                        File.SetLastWriteTimeUtc(path, dt);
+                    }
+
+                    // Finally, delete the file
+                    File.Delete(path);
+                    break;
+                }
+                case false when isFolder: {
+                    // is folder
+                    if (wipe) {
+                        WipeFolder(path);
+                    }
+                    else {
+                        Directory.Delete(path, true);
+                    }
+
+                    break;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -208,16 +224,16 @@ a value) and it will recognize it! Defaults to current directory.
         /// </summary>
         /// <param name="folder">The folder to be wiped</param>
         /// <returns>If the operation was successful or not.</returns>
-        public static bool WipeFolder(string folder)
+        private static void WipeFolder(string folder)
         {
             try {
                 if (!Directory.Exists(folder)) 
-                    return true;
+                    return;
 
                 DirectoryInfo dir = new(folder);
                 
                 foreach (FileInfo file in dir.GetFiles())
-                    WipeFile(file.FullName);
+                    WipePath(file.FullName, true);
 
                 foreach (DirectoryInfo subDir in dir.GetDirectories())
                     WipeFolder(subDir.FullName);
@@ -234,10 +250,9 @@ a value) and it will recognize it! Defaults to current directory.
 
                 // Finally, delete the folder
                 Directory.Delete(folder, true);
-                return true;
             }
-            catch(Exception) {
-                return false;
+            catch {
+                // ignored
             }
         }
         

@@ -1,9 +1,7 @@
 ﻿using PerrysNetConsole;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Prompt = Sharprompt.Prompt;
@@ -74,15 +72,16 @@ public static class Program
             if (isNoGui || helpRequested || versionRequested)
                 await StartCli(opt);
             else
-                await StartInteractive();
+                await StartInteractive(folderPath);
         }
     }
 
-    private static async Task StartInteractive() {
+    private static async Task StartInteractive(string folder) {
         
         Utils.ShowSplashScreen();
 
-        string? state = Prompt.Select("What do you want", new[] { "Encrypt Files", 
+        string? state = Prompt.Select("What do you want", new[] { 
+            "Encrypt Files", 
             "Decrypt Files", 
             "Info about program",
             "Exit"
@@ -100,8 +99,8 @@ public static class Program
             case "Exit":
                 return;
             case "Encrypt Files":
-                useRam = Prompt.Confirm("Encrypt files in memory? (Fast, but demands more ram)", false);
-                clearTraces = Prompt.Confirm("Clear traces? (Very Slow, but more secure)", false);
+                useRam = Prompt.Confirm("Encrypt files in memory? (Fast, but demands more ram)");
+                clearTraces = Prompt.Confirm("Clear traces? (Very Slow, but more secure)");
                 break;
             case "Decrypt Files":
                 useRam = Prompt.Confirm("Decrypt files in memory? (Fast, but demands more ram)");
@@ -114,16 +113,22 @@ public static class Program
         string? pwd = Prompt.Password("Enter password", 
             placeholder: "Take Care With CAPS-LOCK", 
             validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
-        string? pwd2 = Prompt.Password("Re-Enter password", 
-            placeholder: "Take Care With CAPS-LOCK", 
-            validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
-        if (pwd != pwd2) 
-            throw new Exception("Passwords do not match");
+        if (state == "Encrypt Files") {
+            string? pwd2 = Prompt.Password("Re-Enter password", 
+                placeholder: "Take Care With CAPS-LOCK", 
+                validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
+            if (pwd != pwd2) {
+                Console.WriteLine("The passwords do not match! Aborting");
+                Console.ReadKey();
+                return;
+            }
+        }
 
         byte[] key = Utils.DeriveKeyFromString(pwd);
         string pwdHash = Utils.GetHash(Utils.HashBytes(key));
         
         Engine engine = new(new EngineConfiguration {
+            FolderPath = folder,
             ProgressBar = progressBar,
             UseRam = useRam,
             ClearTraces = clearTraces
@@ -173,21 +178,21 @@ public static class Program
 
     } 
     
-    private static async Task<bool> StartCli(ProgramOptions opt) {
+    private static async Task StartCli(ProgramOptions opt) {
         if (opt.HelpRequested) {
             Utils.ShowInfoScreen();
-            return true;
+            return;
         }
         
         if (opt.VersionRequested) {
             string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown";
             Utils.WriteLine($"Current SafeFolder version: {version}", version == "Unknown" ? ConsoleColor.Red : ConsoleColor.Green);
-            return true;
+            return;
         }
 
         bool error = CheckForInputError(opt); // returns true on error, false on success
         if (error) 
-            return false;
+            return;
 
         byte[] key = Utils.DeriveKeyFromString(opt.Password!);
         string pwdHash = Utils.GetHash(Utils.HashBytes(key));
@@ -211,10 +216,8 @@ public static class Program
             await engine.UnpackFiles(key, pwdHash);
         }
 
-        
         if (opt.Verbose) 
             Utils.WriteLine($"Done in {engine.Elapsed:mm\\:ss\\:fff}!");
-        return true;
     }
     
     

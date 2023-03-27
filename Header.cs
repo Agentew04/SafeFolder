@@ -9,7 +9,7 @@ public class Header {
     public bool IsFolder { get; set; }
     public string Name { get; set; } = "";
     public Guid Guid { get; set; } = Guid.NewGuid();
-    public int IvLength { get; set; } = 0;
+    public int IvLength { get; set; }
     public byte[] Iv { get; set; } = Array.Empty<byte>();
     
     [JsonIgnore]

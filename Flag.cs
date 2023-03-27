@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 
 namespace SafeFolder;
 
@@ -80,7 +81,7 @@ public class Flag {
             if (IsFlag(arg)) {
                 Flag? flag = flags.FirstOrDefault(x => arg == "--"+x.Full || arg == "-"+x.Simplified);
                 if (flag is null)
-                    throw new Exception($"Flag '{arg}' does not exist!");
+                    throw new FlagException($"Flag '{arg}' does not exist!");
 
                 if (flag.HasValue) {
                     argsList.RemoveAt(i+1);
@@ -109,4 +110,11 @@ public class Flag {
     public Flag Clone() {
         return new Flag(Full, Simplified, HasValue, CanBeEmpty, Value);
     }
+}
+
+[Serializable]
+public class FlagException : Exception {
+    protected FlagException(SerializationInfo info, StreamingContext ctx) : base(info, ctx){}
+    
+    public FlagException(string message) : base(message){}
 }

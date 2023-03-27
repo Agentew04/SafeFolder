@@ -12,17 +12,11 @@ public static class Extensions {
     public static void Write(this BinaryWriter stream, Guid guid) => stream.Write(guid.ToByteArray());
     
     /// <summary>
-    /// Reads a guid from a binary stream
-    /// </summary>
-    /// <param name="stream">The binary stream</param>
-    /// <returns>The guid that has been read</returns>
-    public static Guid ReadGuid(this BinaryReader stream) => new(stream.ReadBytes(16));
-    
-    /// <summary>
     /// Writes the file header to the stream
     /// </summary>
     /// <param name="writer">The binaryWrite object</param>
     /// <param name="header">The header object</param>
+    /// <param name="key">The key used to encrypt the original filename</param>
     public static void Write(this BinaryWriter writer, Header header, byte[] key)
     {
         writer.Write(header.Hash);
@@ -32,6 +26,13 @@ public static class Extensions {
         writer.Write(header.IvLength);
         writer.Write(header.Iv);
     }
+    
+    /// <summary>
+    /// Reads a guid from a binary stream
+    /// </summary>
+    /// <param name="stream">The binary stream</param>
+    /// <returns>The guid that has been read</returns>
+    public static Guid ReadGuid(this BinaryReader stream) => new(stream.ReadBytes(16));
     
     /// <summary>
     /// Reads a header from a binary stream
