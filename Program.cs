@@ -80,7 +80,8 @@ public static class Program
         
         Utils.ShowSplashScreen();
 
-        string? state = Prompt.Select("What do you want", new[] { "Encrypt Files", 
+        string? state = Prompt.Select("What do you want", new[] { 
+            "Encrypt Files", 
             "Decrypt Files", 
             "Info about program",
             "Exit"
@@ -98,8 +99,8 @@ public static class Program
             case "Exit":
                 return;
             case "Encrypt Files":
-                useRam = Prompt.Confirm("Encrypt files in memory? (Fast, but demands more ram)", false);
-                clearTraces = Prompt.Confirm("Clear traces? (Very Slow, but more secure)", false);
+                useRam = Prompt.Confirm("Encrypt files in memory? (Fast, but demands more ram)");
+                clearTraces = Prompt.Confirm("Clear traces? (Very Slow, but more secure)");
                 break;
             case "Decrypt Files":
                 useRam = Prompt.Confirm("Decrypt files in memory? (Fast, but demands more ram)");
@@ -112,12 +113,15 @@ public static class Program
         string? pwd = Prompt.Password("Enter password", 
             placeholder: "Take Care With CAPS-LOCK", 
             validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
-        string? pwd2 = Prompt.Password("Re-Enter password", 
-            placeholder: "Take Care With CAPS-LOCK", 
-            validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
-        if (pwd != pwd2) {
-            Console.WriteLine("The passwords do not match! Aborting");
-            return;
+        if (state == "Encrypt Files") {
+            string? pwd2 = Prompt.Password("Re-Enter password", 
+                placeholder: "Take Care With CAPS-LOCK", 
+                validators: new[] { Sharprompt.Validators.Required(), Sharprompt.Validators.MinLength(4) });
+            if (pwd != pwd2) {
+                Console.WriteLine("The passwords do not match! Aborting");
+                Console.ReadKey();
+                return;
+            }
         }
 
         byte[] key = Utils.DeriveKeyFromString(pwd);
