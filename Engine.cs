@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace SafeFolder;
 
@@ -25,6 +26,7 @@ public class Engine {
     private readonly List<Regex> _blacklist = new();
     private readonly bool _useRam;
     private readonly bool _clearTraces;
+    private readonly int _chunkSize = 4096; 
 
     public TimeSpan Elapsed => _clock.Elapsed; 
     
@@ -63,6 +65,40 @@ public class Engine {
         return (header, encFile);
     }
 
+    private static Aes CreateAes(byte[] key, byte[] iv) {
+        var aes = Aes.Create();
+        aes.KeySize = KeySize;
+        aes.BlockSize = BlockSize;
+        aes.Padding = PaddingMode;
+        aes.Mode = CipherMode;
+        aes.Key = key;
+        aes.IV = iv;
+        return aes;
+    }
+
+    #region Chunks
+
+    private static void PackChunk(byte[] key, string pwdHash, int chunkId, byte[] chunk, Stream outStream) {
+        //using var inStream = File.OpenRead(file);
+        using var inStream = new MemoryStream(chunk);
+        using var bw = new BinaryWriter(outStream);
+        
+        (Header header, string encFile) = GenerateHeader(false);
+        header.Hash = pwdHash;
+        header.Name = chunkId.ToString();
+        bw.Write(header, key);
+
+        using var aes = CreateAes(key, header.Iv);
+        using var cryptoStream = new CryptoStream(outStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
+        Span<byte> buffer = stackalloc byte[1024];
+        int bytesRead;
+        while ( (bytesRead= inStream.Read(buffer)) > 0) {
+            cryptoStream.Write(buffer[..bytesRead]);
+        }
+    }
+
+    #endregion
+    
     #region Files
 
     private static void PackSingleFile(byte[] key, string pwdHash, string file) {
@@ -79,13 +115,8 @@ public class Engine {
         #endregion
 
         #region cryptography
-        using var aes = Aes.Create();
-        aes.KeySize = KeySize;
-        aes.BlockSize = BlockSize;
-        aes.Padding = PaddingMode;
-        aes.Mode = CipherMode;
-        aes.Key = key;
-        aes.IV = header.Iv;
+
+        using var aes = CreateAes(key, header.Iv);
         
         using var cryptoStream = new CryptoStream(outStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
         Span<byte> buffer = stackalloc byte[1024];
@@ -117,13 +148,8 @@ public class Engine {
             #endregion
 
             #region cryptography
-            using var aes = Aes.Create();
-            aes.KeySize = KeySize;
-            aes.BlockSize = BlockSize;
-            aes.Padding = PaddingMode;
-            aes.Mode = CipherMode;
-            aes.Key = key;
-            aes.IV = header.Iv;
+
+            using var aes = CreateAes(key, header.Iv);
             
             using CryptoStream cryptoStream = new(outStream, aes.CreateEncryptor(), CryptoStreamMode.Write);
             Span<byte> buffer = stackalloc byte[1024];
@@ -187,57 +213,41 @@ public class Engine {
     public async Task PackFiles(byte[] key, string pwdHash) {
         _clock.Restart();
         bool verbose = _progress is not null;
-        List<string> files = Directory.EnumerateFiles(_folderPath)
-            .Where(f => !Path.GetFileName(f).Contains(_safeFolderName)) // is not executable
-            .Where(f => !f.EndsWith(".enc"))
-#if DEBUG
-            .Where(f => !(f.EndsWith(".pdb"))
-#endif
-            .Where(file => !_blacklist.Any(regex => regex.Match(file).Success))
-            .ToList();
+
+        FilePacker packer = new(_folderPath);
+        await using var tarStream = await packer.PackIntoTar();
+        _progress?.Message(Message.LEVEL.DEBUG, "Tarball created successfully. Segmenting now");
+        _progress?.Message(Message.LEVEL.DEBUG, "Deleting original files");
+        Utils.WipePath(_folderPath, _clearTraces);
         
-        List<string> folders = Directory.GetDirectories(_folderPath)
-            .Where(folder => !_blacklist.Any(regex => regex.Match(folder).Success))
-            .ToList();
+        var chunkCount = Math.Ceiling(tarStream.Length / (double)_chunkSize);
+        double progressPerItem = 100 / chunkCount;
 
-        double progressPerItem = PercentPerItem(files.Count + folders.Count);
+        List<Task> threads = new List<Task>();
+        byte[] buffer = new byte[_chunkSize];
+        int bytesRead;
+        int i = 0;
+        while ((bytesRead = await tarStream.ReadAsync(buffer)) > 0) {
+            var chunk = new byte[bytesRead];
+            Array.Copy(buffer, chunk, bytesRead);
+            
+            threads.Add(Task.Run(() => {
+                try {
+                    using FileStream fs = new($"{i}.chunk.enc", FileMode.Create);
+                    PackChunk(key, pwdHash, i, chunk, fs);
+                    _progress?.Message(Message.LEVEL.DEBUG, $"Chunk #{i} encrypted successfully");
+                    if (verbose) _progress.Percentage += progressPerItem;
+                }
+                catch (Exception ex) {
+                    _progress?.Message(Message.LEVEL.ERROR, $"{ex.Message}");
+                    _progress?.Stop();
+                    Console.WriteLine(ex);
+                }
+            }));
+            i++;
+        }
 
-        // encrypt files
-        await Parallel.ForEachAsync(files, (file, _) =>
-        {
-            try{
-                PackSingleFile(key, pwdHash, Path.GetFileName(file));
-                _progress?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(file)} encrypted successfully");
-                Utils.WipePath(file, _clearTraces);
-                if(verbose) _progress.Percentage += progressPerItem;
-            }catch (Exception e) {
-                _progress?.Message(Message.LEVEL.ERROR, $"{e.Message}");
-                _progress?.Stop();
-                Console.WriteLine(e);
-            }
-
-            return ValueTask.CompletedTask;
-        });
-
-        // encrypt folders
-        await Parallel.ForEachAsync(folders, (folder, _) =>
-        {
-            try{
-                PackSingleFolder(key, pwdHash, Path.GetFileName(folder));
-                _progress?.Message(Message.LEVEL.DEBUG, $"{Path.GetFileName(folder)} encrypted successfully");
-                Utils.WipePath(folder, _clearTraces);
-                Utils.WipePath($"{folder}.zip", _clearTraces);
-                if(_progress is not null)
-                    _progress.Percentage += progressPerItem;
-            }catch (Exception e)
-            {
-                _progress?.Message(Message.LEVEL.ERROR, $"{e.Message}");
-                _progress?.Stop();
-                Console.WriteLine(e);
-            }
-
-            return ValueTask.CompletedTask;
-        });
+        await Task.WhenAll(threads);
         _clock.Stop();
     }
 
